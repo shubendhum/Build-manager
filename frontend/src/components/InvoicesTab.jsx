@@ -43,10 +43,10 @@ const InvoiceRow = ({ invoice, onEdit, onDelete, onPay, onDeletePayment }) => (
         {invoice.payments.length > 0 && (
           <div className="mt-2 space-y-1">
             {invoice.payments.map((p) => (
-              <p key={p.id} className="text-xs text-emerald-400/90 flex items-center gap-2" data-testid={`payment-${p.id}`}>
+              <p key={p.id} className="text-xs text-emerald-400/90 flex items-center gap-2" data-testid={`payment-${invoice.id}-${p.id}`}>
                 <Banknote className="h-3 w-3" aria-hidden="true" />
                 {formatMoney(p.amount)} on {formatDate(p.date)}{p.note && ` (${p.note})`}
-                <button data-testid={`payment-delete-${p.id}`} onClick={() => onDeletePayment(invoice, p)}
+                <button data-testid={`payment-delete-${invoice.id}-${p.id}`} onClick={() => onDeletePayment(invoice, p)}
                   className="text-slate-600 hover:text-red-400 transition-colors duration-200">
                   <X className="h-3 w-3" aria-hidden="true" />
                 </button>

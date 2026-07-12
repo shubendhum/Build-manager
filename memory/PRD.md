@@ -37,10 +37,19 @@ Construction project management app for a licensed builder's Project Manager in 
 ## Endpoint Contract (Phase 0)
 PhotoAnalysisRecord: { id, filename, stage_hint, notes, analysis: { identified_stage: site-preparation|base/slab|frame|lockup|fixing|completion|external-works|unknown, progress_notes: str, observations: [str], potential_issues: [str], confidence: low|medium|high }, image_url: "/api/photos/{id}/image", created_at: ISO }
 
+### Phase 2 (2026-02) — Trades, Quotes, Invoicing & Progress Claims ✅
+- Trades (/app/backend/trades.py): global CRUD, 14 trade types, licence/insurance expiry warnings (expired / expiring-soon ≤30 days, computed in `warnings` array), rating 1-5. Delete blocked if referenced by quotes/invoices; cascade unlinks tasks + project assignments. Project assignment via `trade_ids` array: GET/POST /api/projects/{id}/trades, DELETE /api/projects/{id}/trades/{trade_id}. Tasks now have optional `trade_id` (roadmap returns `trade_name`); free-text `assigned_trade` kept for backward compat.
+- Quotes (/app/backend/quotes.py): GET/POST /api/projects/{id}/quotes, PUT/DELETE /api/quotes/{id}, POST /api/quotes/{id}/accept (auto-rejects ALL other quotes in same work_package, returns rejected_count), attachment POST/GET /api/quotes/{id}/attachment (PDF/JPEG/PNG/WEBP ≤10MB, disk at uploads/quotes/). Lazy expiry: pending quotes past expiry_date auto-flip to expired on list. GST auto-10% computed client-side (editable).
+- Invoices (/app/backend/invoices.py): GET/POST /api/projects/{id}/invoices (GET returns summary: total_invoiced/total_paid/outstanding/overdue_count), PUT/DELETE /api/invoices/{id}, POST /api/invoices/{id}/payments, DELETE .../payments/{payment_id}. Derived: amount_paid, balance, status (unpaid/part-paid/paid), is_overdue. Non-blocking `warning` in response when invoices linked to a quote exceed its total.
+- Claims (/app/backend/claims.py): VIC schedule Deposit 5/Base 10/Frame 15/Lockup 35/Fixing 25/Completion 10 (last line absorbs rounding). GET /api/projects/{id}/claims (summary with variance warning), POST /api/projects/{id}/claims/generate (?force=true regenerates, 409 otherwise), PUT /api/claims/{id} (auto-stamps claimed_date/paid_date on status transitions).
+- Frontend: TradesPage (/trades + sidebar nav), TradeCard/TradeFormDialog, ProjectTradesTab (assign/unassign), QuotesTab (grouped by work package, side-by-side compare, accept confirm dialog, attach), InvoicesTab (summary cards, payment recording/deletion, overdue styling) with ClaimsSection embedded (inline amount edit, status selects, regenerate). Project detail tabs Trades/Quotes/Invoices live; Budget/Photos/Documents still disabled. TaskDialog has "Linked trade" select; TaskRow shows amber chip for linked trade.
+- Seed (idempotent via is_seed on trades): 6 trades (JT Plumbing & Gas licence expiring-soon), 4 quotes in 2 work packages (electrical accepted+rejected, plumbing 2 pending), 3 invoices (INV-1042 paid, INV-2210 unpaid, INV-0871 part-paid overdue linked to accepted quote; summary 63360/30460/32900/1), claims Deposit+Base paid + Frame claimed (186000 claimed / 93000 paid).
+- Testing: iteration_3 — backend 23/23, frontend 100%. Suite: /app/backend/tests/test_phase2.py (self-restores seed).
+
 ## Prioritized Backlog
-- P0 (Phase 2): Trades directory + link trade entities to tasks; quote management.
-- P1 (Phase 3): Invoicing; cost estimation w/ VIC 2025 trade rate guide; budget tracking.
-- P2 (Phase 4-5): Per-project Photos tab UI; document storage; full dashboard; "Export to Site Diary" PDF (approved); forgot-password flow.
+- P0 (Phase 3): Cost estimation with built-in Victoria 2025 trade rate guide; budget tracking (consume accepted quotes as commitments); full dashboard incl. approved upcoming-RBS-inspection reminders ("Frame inspection due in 5 days").
+- P1 (Phase 4): Per-project Photos tab UI; document storage; "Export to Site Diary" PDF (approved).
+- P2 (Phase 5): polish, forgot-password flow.
 - Deferred hardening notes: streaming upload size check, pagination on GET /api/photos, cookie secure flag env-driven for production, CORS fallback default.
 
 ## Integration Caveats
