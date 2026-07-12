@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectOverview } from "@/components/ProjectOverview";
+import { PlannerTab } from "@/components/PlannerTab";
 import { RoadmapView } from "@/components/RoadmapView";
 import { ProjectTradesTab } from "@/components/ProjectTradesTab";
 import { QuotesTab } from "@/components/QuotesTab";
@@ -85,6 +86,7 @@ export default function ProjectDetailPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-slate-800/60 h-auto max-w-full justify-start overflow-x-auto flex-nowrap md:flex-wrap">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="planner" data-testid="tab-planner">AI Planner</TabsTrigger>
           <TabsTrigger value="roadmap" data-testid="tab-roadmap">Roadmap &amp; Tasks</TabsTrigger>
           <TabsTrigger value="trades" data-testid="tab-trades">Trades</TabsTrigger>
           <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
@@ -96,6 +98,9 @@ export default function ProjectDetailPage() {
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <ProjectOverview project={project} onChanged={fetchProject} />
+        </TabsContent>
+        <TabsContent value="planner" className="mt-6">
+          <PlannerTab project={project} onChanged={fetchProject} />
         </TabsContent>
         <TabsContent value="roadmap" className="mt-6">
           <RoadmapView projectId={project.id} onProgressChanged={fetchProject} />
