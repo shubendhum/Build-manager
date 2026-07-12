@@ -9,7 +9,7 @@ DEMO_PROJECT_NAME = "Residence – Ballarat West"
 
 
 async def seed_user():
-    email = os.environ.get("ADMIN_EMAIL", "pm@buildmanagervic.com.au").lower()
+    email = os.environ.get("ADMIN_EMAIL", "pm@rldtech.com.au").lower()
     password = os.environ.get("ADMIN_PASSWORD", "SitePM-2026")
     existing = await db.users.find_one({"email": email})
     if existing is None:

@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from PIL import Image
 from pydantic import BaseModel, Field
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -34,7 +34,7 @@ from documents import documents_router  # noqa: E402
 from reports import reports_router  # noqa: E402
 from seed import seed_all  # noqa: E402
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+VLLM_VISION_URL = os.environ.get('VLLM_VISION_URL', 'http://host.docker.internal:8002/v1')
 
 UPLOAD_DIR = ROOT_DIR / 'uploads'
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -132,17 +132,34 @@ def parse_ai_response(raw: str) -> AnalysisData:
 
 
 async def run_ai_analysis(image_b64: str, stage_hint: Optional[str], notes: Optional[str]) -> AnalysisData:
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"photo-analysis-{uuid.uuid4()}",
-        system_message=SYSTEM_PROMPT,
-    ).with_model("openai", "gpt-4o")
-    message = UserMessage(
-        text=build_user_prompt(stage_hint, notes),
-        file_contents=[ImageContent(image_base64=image_b64)],
-    )
-    response = await chat.send_message(message)
-    return parse_ai_response(response)
+    """Call local vLLM vision model (Qwen3-VL-32B) for construction photo analysis."""
+    url = f"{VLLM_VISION_URL}/chat/completions"
+    payload = {
+        "model": "vllm-qwen3-vl-32b",
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
+                    {"type": "text", "text": build_user_prompt(stage_hint, notes)},
+                ],
+            },
+        ],
+        "max_tokens": 1024,
+        "temperature": 0.0,
+    }
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            raw = data["choices"][0]["message"]["content"]
+        except httpx.HTTPError as e:
+            raise RuntimeError(f"Vision model request failed: {e}")
+        except (KeyError, IndexError) as e:
+            raise RuntimeError(f"Unexpected vision model response format: {e}")
+    return parse_ai_response(raw)
 
 
 # ---------- Routes ----------

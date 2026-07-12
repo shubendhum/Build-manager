@@ -1,0 +1,14 @@
+.git/
+.gitignore
+.gitconfig
+.env
+.env.*
+.DS_Store
+*.log
+memory/
+mobile/
+test_reports/
+auth_testing.md
+image_testing.md
+design_guidelines.json
+.emergent/
