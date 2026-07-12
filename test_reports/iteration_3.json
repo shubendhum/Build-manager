@@ -1,0 +1,28 @@
+{
+  "summary": "Phase 2 (Trades, Quotes, Invoices, Claims) end-to-end tested. 23/23 backend pytest cases pass. Frontend flows verified via Playwright: Trades page (6 cards + JT licence-expiring badge, Add/Edit/Delete), Project Trades tab (6 assigned), Quotes tab (4 cards with correct statuses, COMMITTED group badge, Accept confirm dialog, Add-Quote GST auto-calc), Invoices tab (exact summary $63,360/$30,460/$32,900/1 overdue, INV-0871 PART-PAID+OVERDUE, Record Payment + delete flow), Claims section (6 rows totalling $620,000, $186,000 claimed, $93,000 paid), Roadmap trade chips on 3 tasks (Ballarat Earthworks / JT Plumbing & Gas / ABC Concreting). All seed data restored to original state; no TEST_ leftovers.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2.py",
+    "/app/test_reports/pytest/phase2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Payment-delete button uses generic 'payment-delete-{payment_id}' testid; when multiple invoices have payments, a global query_selector returns the first row's payment (INV-1042's paid payment came first). Consider scoping payment testids by invoice_id (e.g. 'payment-delete-{invoice_id}-{payment_id}') to make automation scripts more robust — this was a test-script hazard, not a product bug.",
+    "trades.py delete_trade sets tasks.trade_id=None on cascade but does not decrement any per-project trade_ids on projects that referenced only via task link — currently fine since project.trade_ids is separate, but worth documenting the semantic split."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2.py (new)"
+  ],
+  "success_rate": {"backend": "100% (23/23)", "frontend": "100%"},
+  "test_credentials": "pm@buildmanagervic.com.au / SitePM-2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. All test artefacts (test trades, quotes, invoices, projects, payments) created inside tests were deleted; INV-1042 paid-payment and INV-2210 unpaid state restored via API after Playwright flow accidentally removed INV-1042's seed payment through a generic payment-delete selector.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend test suite at /app/backend/tests/test_phase2.py covers all Phase 2 features and self-restores seed. Requires REACT_APP_BACKEND_URL env var. Playwright note: use invoice-scoped selectors when deleting a specific payment (multiple payment-delete-* elements exist on the invoices tab). Phase 1 photo AI test in test_phase1.py::TestPhotos::test_photo_analyze_with_project_and_filter makes 1 real Emergent AI call — skip if credit-constrained.",
+  "rca of the issue": "N/A — no bugs found. Only a minor SDET-side hazard: generic 'payment-delete-{payment_id}' testids without invoice scoping caused an initial test click to hit INV-1042's payment; state was restored via API before finishing."
+}

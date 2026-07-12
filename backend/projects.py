@@ -66,6 +66,7 @@ class TaskInput(BaseModel):
     status: str = "not-started"
     due_date: Optional[str] = None
     assigned_trade: str = ""
+    trade_id: Optional[str] = None
     is_mandatory_inspection: bool = False
 
 
@@ -76,6 +77,7 @@ class TaskUpdate(BaseModel):
     status: Optional[str] = None
     due_date: Optional[str] = None
     assigned_trade: Optional[str] = None
+    trade_id: Optional[str] = None
     is_mandatory_inspection: Optional[bool] = None
     sort_order: Optional[int] = None
 
@@ -141,6 +143,7 @@ async def generate_roadmap_tasks(project_id: str) -> List[dict]:
                 "status": "not-started",
                 "due_date": None,
                 "assigned_trade": "",
+                "trade_id": None,
                 "is_mandatory_inspection": is_inspection,
                 "sort_order": idx * 10,
                 "is_custom": False,
@@ -219,6 +222,12 @@ async def get_roadmap(project_id: str):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
     tasks = await db.tasks.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
+    # Resolve linked trade business names
+    trade_ids = list({t["trade_id"] for t in tasks if t.get("trade_id")})
+    trade_docs = await db.trades.find({"id": {"$in": trade_ids}}, {"_id": 0, "id": 1, "business_name": 1}).to_list(500)
+    trade_names = {t["id"]: t["business_name"] for t in trade_docs}
+    for t in tasks:
+        t["trade_name"] = trade_names.get(t.get("trade_id"))
     counts = await stage_counts_for_projects([project_id])
     overall, per_stage = compute_progress(counts.get(project_id, {}))
     stages = []
@@ -248,6 +257,8 @@ async def create_task(project_id: str, data: TaskInput):
         raise HTTPException(status_code=400, detail=f"status must be one of: {sorted(TASK_STATUSES)}")
     if not data.title.strip():
         raise HTTPException(status_code=400, detail="Task title is required.")
+    if data.trade_id and not await db.trades.find_one({"id": data.trade_id}):
+        raise HTTPException(status_code=404, detail="Trade not found.")
     last = await db.tasks.find({"project_id": project_id, "stage_key": data.stage_key}).sort("sort_order", -1).to_list(1)
     task = data.model_dump()
     task["title"] = task["title"].strip()
@@ -274,6 +285,8 @@ async def update_task(task_id: str, data: TaskUpdate):
         raise HTTPException(status_code=400, detail=f"stage_key must be one of: {sorted(STAGE_KEYS)}")
     if "title" in updates and updates["title"] is not None and not updates["title"].strip():
         raise HTTPException(status_code=400, detail="Task title cannot be empty.")
+    if updates.get("trade_id") and not await db.trades.find_one({"id": updates["trade_id"]}):
+        raise HTTPException(status_code=404, detail="Trade not found.")
     if updates.get("due_date") == "":
         updates["due_date"] = None
     updates["updated_at"] = now_iso()

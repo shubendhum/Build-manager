@@ -50,9 +50,10 @@ export const TaskRow = ({ task, onChanged }) => {
         </div>
         {task.description && <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">{task.description}</p>}
         <div className="flex flex-wrap items-center gap-3 mt-1">
-          {task.assigned_trade && (
-            <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-              <Wrench className="h-3 w-3 text-amber-400" aria-hidden="true" /> {task.assigned_trade}
+          {(task.trade_name || task.assigned_trade) && (
+            <span className={`inline-flex items-center gap-1 text-xs ${task.trade_name ? "text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5" : "text-slate-400"}`}
+              data-testid={`task-trade-${task.id}`}>
+              <Wrench className="h-3 w-3 text-amber-400" aria-hidden="true" /> {task.trade_name || task.assigned_trade}
             </span>
           )}
           {task.due_date && (

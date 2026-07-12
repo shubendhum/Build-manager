@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut } from "lucide-react";
+import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut, Hammer } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
   { to: "/projects", label: "Projects", icon: FolderKanban, end: false, testId: "nav-projects" },
+  { to: "/trades", label: "Trades", icon: Hammer, end: false, testId: "nav-trades" },
   { to: "/analyzer", label: "Photo Analyzer", icon: ScanSearch, end: false, testId: "nav-analyzer" },
 ];
 

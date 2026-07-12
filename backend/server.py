@@ -22,6 +22,10 @@ load_dotenv(ROOT_DIR / '.env')
 from db import client, db  # noqa: E402
 from auth import auth_router, get_current_user  # noqa: E402
 from projects import projects_router, tasks_router  # noqa: E402
+from trades import trades_router  # noqa: E402
+from quotes import quotes_router  # noqa: E402
+from invoices import invoices_router  # noqa: E402
+from claims import claims_router  # noqa: E402
 from seed import seed_all  # noqa: E402
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
@@ -233,6 +237,10 @@ async def get_photo_image(photo_id: str, user: dict = Depends(get_current_user))
 app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
+app.include_router(trades_router)
+app.include_router(quotes_router)
+app.include_router(invoices_router)
+app.include_router(claims_router)
 app.include_router(api_router)
 
 

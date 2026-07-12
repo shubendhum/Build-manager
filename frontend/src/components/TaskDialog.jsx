@@ -12,15 +12,19 @@ import { DatePicker } from "@/components/DatePicker";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { TASK_STATUSES } from "@/lib/projectUtils";
 
-const EMPTY = { title: "", description: "", status: "not-started", due_date: "", assigned_trade: "", is_mandatory_inspection: false };
+const EMPTY = { title: "", description: "", status: "not-started", due_date: "", assigned_trade: "", trade_id: "none", is_mandatory_inspection: false };
 
 export const TaskDialog = ({ open, onOpenChange, projectId, stageKey, task, onSaved }) => {
   const [form, setForm] = useState(EMPTY);
+  const [trades, setTrades] = useState([]);
   const [busy, setBusy] = useState(false);
   const isEdit = Boolean(task);
 
   useEffect(() => {
-    if (open) setForm(task ? { ...EMPTY, ...task, due_date: task.due_date || "" } : EMPTY);
+    if (open) {
+      setForm(task ? { ...EMPTY, ...task, due_date: task.due_date || "", trade_id: task.trade_id || "none" } : EMPTY);
+      api.get("/trades").then(({ data }) => setTrades(data)).catch(() => {});
+    }
   }, [open, task]);
 
   const fieldCls = "bg-slate-800/50 border-slate-600";
@@ -35,6 +39,7 @@ export const TaskDialog = ({ open, onOpenChange, projectId, stageKey, task, onSa
         status: form.status,
         due_date: form.due_date || null,
         assigned_trade: form.assigned_trade,
+        trade_id: form.trade_id === "none" ? null : form.trade_id,
         is_mandatory_inspection: form.is_mandatory_inspection,
       };
       if (isEdit) {
@@ -88,7 +93,17 @@ export const TaskDialog = ({ open, onOpenChange, projectId, stageKey, task, onSa
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs uppercase tracking-[0.15em] text-slate-400">Assigned trade</Label>
+            <Label className="text-xs uppercase tracking-[0.15em] text-slate-400">Linked trade (from directory)</Label>
+            <Select value={form.trade_id} onValueChange={(v) => setForm((f) => ({ ...f, trade_id: v }))}>
+              <SelectTrigger data-testid="task-form-linked-trade" className={fieldCls}><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-64">
+                <SelectItem value="none">No linked trade</SelectItem>
+                {trades.map((t) => <SelectItem key={t.id} value={t.id}>{t.business_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.15em] text-slate-400">Assigned trade (free text)</Label>
             <Input data-testid="task-form-trade" className={fieldCls} value={form.assigned_trade} placeholder="e.g. ABC Concreting"
               onChange={(e) => setForm((f) => ({ ...f, assigned_trade: e.target.value }))} />
           </div>

@@ -6,10 +6,13 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { RoadmapView } from "@/components/RoadmapView";
+import { ProjectTradesTab } from "@/components/ProjectTradesTab";
+import { QuotesTab } from "@/components/QuotesTab";
+import { InvoicesTab } from "@/components/InvoicesTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
-const FUTURE_TABS = ["Trades", "Quotes", "Invoices", "Budget", "Photos", "Documents"];
+const FUTURE_TABS = ["Budget", "Photos", "Documents"];
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -74,6 +77,9 @@ export default function ProjectDetailPage() {
         <TabsList className="bg-slate-800/60 flex-wrap h-auto">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="roadmap" data-testid="tab-roadmap">Roadmap &amp; Tasks</TabsTrigger>
+          <TabsTrigger value="trades" data-testid="tab-trades">Trades</TabsTrigger>
+          <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
+          <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
           {FUTURE_TABS.map((t) => (
             <TabsTrigger key={t} value={t.toLowerCase()} disabled data-testid={`tab-${t.toLowerCase()}`} className="opacity-40">
               {t}
@@ -85,6 +91,15 @@ export default function ProjectDetailPage() {
         </TabsContent>
         <TabsContent value="roadmap" className="mt-6">
           <RoadmapView projectId={project.id} onProgressChanged={fetchProject} />
+        </TabsContent>
+        <TabsContent value="trades" className="mt-6">
+          <ProjectTradesTab projectId={project.id} />
+        </TabsContent>
+        <TabsContent value="quotes" className="mt-6">
+          <QuotesTab projectId={project.id} />
+        </TabsContent>
+        <TabsContent value="invoices" className="mt-6">
+          <InvoicesTab projectId={project.id} contractValue={project.contract_value} />
         </TabsContent>
       </Tabs>
     </main>

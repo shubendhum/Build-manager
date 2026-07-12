@@ -26,11 +26,25 @@ export const TASK_STATUSES = [
   { value: "n-a", label: "N/A", dot: "bg-slate-600" },
 ];
 
+export const ROADMAP_STAGES = [
+  { value: "pre-construction", label: "Pre-Construction" },
+  { value: "base", label: "Base" },
+  { value: "frame", label: "Frame" },
+  { value: "lockup", label: "Lockup" },
+  { value: "fixing", label: "Fixing" },
+  { value: "completion", label: "Completion" },
+];
+
+export const roadmapStageLabel = (v) => ROADMAP_STAGES.find((s) => s.value === v)?.label || v;
+
 export const typeLabel = (v) => PROJECT_TYPES.find((t) => t.value === v)?.label || v;
 export const statusLabel = (v) => PROJECT_STATUSES.find((s) => s.value === v)?.label || v;
 
 export const formatAUD = (value) =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(value || 0);
+
+export const formatMoney = (value) =>
+  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
 
 export const formatDate = (iso) => {
   if (!iso) return "—";
