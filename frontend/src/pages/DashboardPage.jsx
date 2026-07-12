@@ -17,14 +17,16 @@ const StatCard = ({ icon: Icon, label, value, testId }) => (
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/projects").then(({ data }) => setProjects(data)).catch(() => {});
+    api.get("/projects").then(({ data }) => setProjects(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const active = projects.filter((p) => p.status === "active");
   const totalValue = projects.reduce((s, p) => s + (p.contract_value || 0), 0);
   const avgProgress = projects.length ? Math.round(projects.reduce((s, p) => s + p.progress, 0) / projects.length) : 0;
+  const show = (v) => (loading ? "…" : v);
 
   return (
     <main className="max-w-7xl mx-auto px-6 py-12" data-testid="dashboard-page">
@@ -33,10 +35,10 @@ export default function DashboardPage() {
       <p className="text-sm text-slate-400 mb-10">Portfolio snapshot — the full dashboard arrives in a later phase.</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <StatCard icon={FolderKanban} label="Projects" value={projects.length} testId="stat-total-projects" />
-        <StatCard icon={Activity} label="Active" value={active.length} testId="stat-active-projects" />
-        <StatCard icon={DollarSign} label="Portfolio Value" value={formatAUD(totalValue)} testId="stat-portfolio-value" />
-        <StatCard icon={TrendingUp} label="Avg Progress" value={`${avgProgress}%`} testId="stat-avg-progress" />
+        <StatCard icon={FolderKanban} label="Projects" value={show(projects.length)} testId="stat-total-projects" />
+        <StatCard icon={Activity} label="Active" value={show(active.length)} testId="stat-active-projects" />
+        <StatCard icon={DollarSign} label="Portfolio Value" value={show(formatAUD(totalValue))} testId="stat-portfolio-value" />
+        <StatCard icon={TrendingUp} label="Avg Progress" value={show(`${avgProgress}%`)} testId="stat-avg-progress" />
       </div>
 
       <div className="flex items-center justify-between mb-4">
@@ -47,7 +49,7 @@ export default function DashboardPage() {
         </Link>
       </div>
       <div className="space-y-3">
-        {active.length === 0 && <p className="text-sm text-slate-500">No active projects.</p>}
+        {!loading && active.length === 0 && <p className="text-sm text-slate-500">No active projects.</p>}
         {active.map((p) => (
           <Link key={p.id} to={`/projects/${p.id}`} data-testid={`dashboard-project-${p.id}`}
             className="block rounded-md border border-slate-700 bg-card px-5 py-4 hover:border-amber-500/50 transition-colors duration-200">
