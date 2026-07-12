@@ -128,14 +128,18 @@ async def site_diary_pdf(
             raise HTTPException(status_code=400, detail=f"{name} must be in YYYY-MM-DD format.")
 
     photos = await db.photo_analyses.find({"project_id": project_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    entries = await db.diary_entries.find({"project_id": project_id}, {"_id": 0}).sort("date", 1).to_list(1000)
     if date_from:
         photos = [p for p in photos if p["created_at"][:10] >= date_from]
+        entries = [e for e in entries if e["date"] >= date_from]
     if date_to:
         photos = [p for p in photos if p["created_at"][:10] <= date_to]
-    if not photos:
-        raise HTTPException(status_code=400, detail="No analysed photos found for this project in the selected date range.")
+        entries = [e for e in entries if e["date"] <= date_to]
+    if not photos and not entries:
+        raise HTTPException(status_code=400, detail="No diary entries or analysed photos found for this project in the selected date range.")
 
-    period = f"{aus_date(photos[0]['created_at'])} – {aus_date(photos[-1]['created_at'])}"
+    all_dates = sorted([p["created_at"][:10] for p in photos] + [e["date"] for e in entries])
+    period = f"{aus_date(all_dates[0])} – {aus_date(all_dates[-1])}"
     story = [
         Paragraph("SITE DIARY", S_TITLE),
         Paragraph(escape(project["name"]), S_SUBTITLE),
@@ -152,16 +156,40 @@ async def site_diary_pdf(
         Spacer(1, 4 * mm),
     ]
 
-    # Group entries by calendar date (ascending)
+    # Group photo analyses and manual diary entries by calendar date (ascending)
     groups = {}
     for p in photos:
-        groups.setdefault(p["created_at"][:10], []).append(p)
+        groups.setdefault(p["created_at"][:10], {"photos": [], "entries": []})["photos"].append(p)
+    for e in entries:
+        groups.setdefault(e["date"], {"photos": [], "entries": []})["entries"].append(e)
+
+    weather_labels = {
+        "sunny": "Sunny", "partly-cloudy": "Partly cloudy", "overcast": "Overcast",
+        "rain": "Rain", "storm": "Storm", "windy": "Windy", "frost": "Frost",
+    }
 
     for date_key in sorted(groups):
         story.append(Paragraph(aus_date(f"{date_key}T00:00:00"), S_H2))
         story.append(HRFlowable(width="100%", thickness=0.6, color=SLATE_LIGHT))
         story.append(Spacer(1, 2.5 * mm))
-        for p in groups[date_key]:
+        # Manual site diary entries first (conditions, crew, notes), then photo analyses
+        for e in groups[date_key]["entries"]:
+            block = [Paragraph("Site diary entry", S_CAPTION)]
+            cond_bits = []
+            if e.get("weather"):
+                cond_bits.append(weather_labels.get(e["weather"], e["weather"]))
+            if e.get("temp_c") is not None:
+                cond_bits.append(f"{e['temp_c']:g}°C")
+            if cond_bits:
+                block.append(Paragraph(f"<b>Conditions:</b> {escape(' · '.join(cond_bits))}", S_BODY))
+            if e.get("crew"):
+                crew_txt = ", ".join(f"{c['trade']} ×{c['count']}" for c in e["crew"])
+                block.append(Paragraph(f"<b>Crew on site:</b> {escape(crew_txt)}", S_BODY))
+            if e.get("notes"):
+                block.append(Paragraph(escape(e["notes"]), S_BODY))
+            story.append(KeepTogether(block))
+            story.append(Spacer(1, 4 * mm))
+        for p in groups[date_key]["photos"]:
             a = p["analysis"]
             stage = PHOTO_STAGE_LABELS.get(a["identified_stage"], a["identified_stage"])
             caption = f"Stage: {stage} &nbsp;·&nbsp; Confidence: {a['confidence'].title()}"

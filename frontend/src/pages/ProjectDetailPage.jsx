@@ -11,6 +11,7 @@ import { QuotesTab } from "@/components/QuotesTab";
 import { InvoicesTab } from "@/components/InvoicesTab";
 import { BudgetTab } from "@/components/BudgetTab";
 import { PhotosTab } from "@/components/PhotosTab";
+import { VariationsTab } from "@/components/VariationsTab";
 import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
@@ -82,7 +83,8 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
           <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
           <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
-          <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
+          <TabsTrigger value="variations" data-testid="tab-variations">Variations</TabsTrigger>
+          <TabsTrigger value="diary" data-testid="tab-diary">Site Diary</TabsTrigger>
           <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-6">
@@ -103,7 +105,10 @@ export default function ProjectDetailPage() {
         <TabsContent value="budget" className="mt-6">
           <BudgetTab project={project} />
         </TabsContent>
-        <TabsContent value="photos" className="mt-6">
+        <TabsContent value="variations" className="mt-6">
+          <VariationsTab projectId={project.id} />
+        </TabsContent>
+        <TabsContent value="diary" className="mt-6">
           <PhotosTab project={project} />
         </TabsContent>
         <TabsContent value="documents" className="mt-6">

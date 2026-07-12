@@ -55,6 +55,24 @@ export const BudgetSection = ({ projectId, refreshKey }) => {
         <span className="text-xs text-slate-500">All figures inc GST</span>
       </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        <div className="rounded-md border border-slate-700 bg-card p-4" data-testid="budget-contract-value">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Contract Value</p>
+          <p className="font-heading text-lg font-bold text-slate-200">{formatMoney(totals.contract_value)}</p>
+        </div>
+        <div className="rounded-md border border-slate-700 bg-card p-4" data-testid="budget-approved-variations">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Approved Variations</p>
+          <p className={`font-heading text-lg font-bold ${totals.approved_variations_total < 0 ? "text-red-400" : "text-emerald-400"}`}>
+            {totals.approved_variations_total >= 0 ? "+" : "−"}{formatMoney(Math.abs(totals.approved_variations_total))}
+          </p>
+        </div>
+        <div className="rounded-md border border-amber-500/40 bg-card p-4" data-testid="budget-adjusted-contract-value">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Adjusted Contract Value</p>
+          <p className="font-heading text-lg font-bold text-amber-400">{formatMoney(totals.adjusted_contract_value)}</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">contract + approved variations</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="rounded-md border border-slate-700 bg-card p-4" data-testid="budget-total-estimated">
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Estimated</p>

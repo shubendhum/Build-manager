@@ -25,6 +25,8 @@ from projects import projects_router, tasks_router  # noqa: E402
 from trades import trades_router  # noqa: E402
 from quotes import quotes_router  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
+from variations import variations_router  # noqa: E402
+from diary import diary_router  # noqa: E402
 from invoices import invoices_router  # noqa: E402
 from claims import claims_router  # noqa: E402
 from rates import rates_router, ensure_reference_rates  # noqa: E402
@@ -276,6 +278,8 @@ app.include_router(trades_router)
 app.include_router(quotes_router)
 app.include_router(rfqs_router)
 app.include_router(public_rfqs_router)
+app.include_router(variations_router)
+app.include_router(diary_router)
 app.include_router(invoices_router)
 app.include_router(claims_router)
 app.include_router(rates_router)

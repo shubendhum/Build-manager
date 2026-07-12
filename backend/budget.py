@@ -3,6 +3,7 @@ from db import db
 from auth import get_current_user
 from roadmap_template import STAGES
 from estimates import DEFAULT_CONTINGENCY
+from variations import approved_variations_total
 
 budget_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
@@ -88,6 +89,10 @@ async def compute_budget(project: dict) -> dict:
         ratio = exposure / estimate_with_contingency
         health = "under" if ratio < 0.95 else ("on-track" if ratio <= 1.05 else "over")
 
+    # Approved (and billed) variations adjust the client-side contract value
+    variations_total = await approved_variations_total(project_id)
+    contract_value = project.get("contract_value", 0) or 0
+
     return {
         "project_id": project_id,
         "by_stage": by_stage,
@@ -101,6 +106,9 @@ async def compute_budget(project: dict) -> dict:
             "paid": paid_total,
             "exposure": exposure,
             "health": health,
+            "contract_value": round(contract_value, 2),
+            "approved_variations_total": variations_total,
+            "adjusted_contract_value": round(contract_value + variations_total, 2),
         },
     }
 
