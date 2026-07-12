@@ -1,8 +1,7 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import io
 import json
@@ -20,10 +19,10 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+from db import client, db  # noqa: E402
+from auth import auth_router, get_current_user  # noqa: E402
+from projects import projects_router, tasks_router  # noqa: E402
+from seed import seed_all  # noqa: E402
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
@@ -55,6 +54,7 @@ class AnalysisData(BaseModel):
 class PhotoAnalysisRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     filename: str
+    project_id: Optional[str] = None
     stage_hint: Optional[str] = None
     notes: Optional[str] = None
     analysis: AnalysisData
@@ -147,7 +147,12 @@ async def analyze_photo(
     file: UploadFile = File(...),
     project_stage: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    project_id: Optional[str] = Form(None),
+    user: dict = Depends(get_current_user),
 ):
+    if project_id:
+        if not await db.projects.find_one({"id": project_id}):
+            raise HTTPException(status_code=404, detail="Project not found.")
     raw_bytes = await file.read()
     if len(raw_bytes) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -193,6 +198,7 @@ async def analyze_photo(
     record = PhotoAnalysisRecord(
         id=photo_id,
         filename=file.filename or f"photo{ext}",
+        project_id=project_id,
         stage_hint=project_stage,
         notes=notes,
         analysis=analysis,
@@ -207,13 +213,14 @@ async def analyze_photo(
 
 
 @api_router.get("/photos", response_model=List[PhotoAnalysisRecord])
-async def list_photos():
-    docs = await db.photo_analyses.find({}, {"_id": 0, "file_path": 0, "media_type": 0}).sort("created_at", -1).to_list(200)
+async def list_photos(project_id: Optional[str] = Query(None), user: dict = Depends(get_current_user)):
+    query = {"project_id": project_id} if project_id else {}
+    docs = await db.photo_analyses.find(query, {"_id": 0, "file_path": 0, "media_type": 0}).sort("created_at", -1).to_list(200)
     return docs
 
 
 @api_router.get("/photos/{photo_id}/image")
-async def get_photo_image(photo_id: str):
+async def get_photo_image(photo_id: str, user: dict = Depends(get_current_user)):
     doc = await db.photo_analyses.find_one({"id": photo_id}, {"_id": 0, "file_path": 1, "media_type": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="Photo not found.")
@@ -223,7 +230,19 @@ async def get_photo_image(photo_id: str):
     return FileResponse(file_path, media_type=doc.get('media_type', 'image/jpeg'))
 
 
+app.include_router(auth_router)
+app.include_router(projects_router)
+app.include_router(tasks_router)
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+async def on_startup():
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+    await db.tasks.create_index([("project_id", 1), ("sort_order", 1)])
+    await seed_all()
+
 
 app.add_middleware(
     CORSMiddleware,

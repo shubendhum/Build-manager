@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
 import { toast } from "sonner";
-import { HardHat, Loader2, ScanSearch } from "lucide-react";
+import { Loader2, ScanSearch } from "lucide-react";
+import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,12 +10,12 @@ import { AnalysisResult } from "@/components/AnalysisResult";
 import { HistoryGrid } from "@/components/HistoryGrid";
 import { STAGES } from "@/lib/stages";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
 export default function AnalyzePage() {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [stageHint, setStageHint] = useState("auto");
+  const [projectId, setProjectId] = useState("none");
+  const [projects, setProjects] = useState([]);
   const [notes, setNotes] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
@@ -24,7 +24,7 @@ export default function AnalyzePage() {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/photos`);
+      const { data } = await api.get("/photos");
       setHistory(data);
     } catch (e) {
       console.error("Failed to load history", e);
@@ -55,8 +55,9 @@ export default function AnalyzePage() {
       const fd = new FormData();
       fd.append("file", file);
       if (stageHint !== "auto") fd.append("project_stage", stageHint);
+      if (projectId !== "none") fd.append("project_id", projectId);
       if (notes.trim()) fd.append("notes", notes.trim());
-      const { data } = await axios.post(`${API}/photos/analyze`, fd, { timeout: 120000 });
+      const { data } = await api.post("/photos/analyze", fd, { timeout: 120000 });
       setResult(data);
       fetchHistory();
       toast.success("AI analysis complete");
@@ -69,21 +70,7 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background blueprint-grid">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-900/80 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-md bg-amber-500 flex items-center justify-center">
-            <HardHat className="h-5 w-5 text-slate-950" aria-hidden="true" />
-          </div>
-          <div>
-            <h1 className="font-heading text-lg font-bold tracking-tight text-slate-100 leading-none">
-              BuildManager <span className="text-amber-400">VIC</span>
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mt-0.5">Phase 0 — AI Photo Analysis</p>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-full" data-testid="analyzer-page">
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="mb-10">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Site Progress Intelligence</p>
@@ -97,6 +84,21 @@ export default function AnalyzePage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
           <div className="lg:col-span-2 rounded-md border border-slate-700 bg-card p-6 space-y-5">
             <UploadZone file={file} previewUrl={previewUrl} onFileSelected={onFileSelected} onClear={onClear} disabled={analyzing} />
+
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">Project (optional)</label>
+              <Select value={projectId} onValueChange={setProjectId} disabled={analyzing}>
+                <SelectTrigger data-testid="project-select" className="bg-slate-800/50 border-slate-600">
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none" data-testid="project-option-none">No project (standalone)</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id} data-testid={`project-option-${p.id}`}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold">Stage hint (optional)</label>
@@ -162,12 +164,6 @@ export default function AnalyzePage() {
 
         <HistoryGrid history={history} loading={historyLoading} />
       </main>
-
-      <footer className="border-t border-slate-800 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <p className="text-xs text-slate-600">BuildManager VIC — construction project management for Victorian builders. Phase 0 POC.</p>
-        </div>
-      </footer>
     </div>
   );
 }
