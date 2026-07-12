@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -16,11 +16,18 @@ import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
+const TAB_VALUES = ["overview", "planner", "roadmap", "trades", "quotes", "invoices", "budget", "variations", "diary", "documents"];
+
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
   const [notFound, setNotFound] = useState(false);
+
+  const requested = searchParams.get("tab");
+  const tab = TAB_VALUES.includes(requested) ? requested : "overview";
+  const setTab = (v) => setSearchParams(v === "overview" ? {} : { tab: v }, { replace: true });
 
   const fetchProject = useCallback(async () => {
     try {
@@ -75,8 +82,8 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList className="bg-slate-800/60 flex-wrap h-auto">
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="bg-slate-800/60 h-auto max-w-full justify-start overflow-x-auto flex-nowrap md:flex-wrap">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="roadmap" data-testid="tab-roadmap">Roadmap &amp; Tasks</TabsTrigger>
           <TabsTrigger value="trades" data-testid="tab-trades">Trades</TabsTrigger>

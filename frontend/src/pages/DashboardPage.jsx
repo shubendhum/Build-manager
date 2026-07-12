@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { FolderKanban, Activity, DollarSign, ReceiptText, ArrowRight, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { FolderKanban, Activity, DollarSign, ReceiptText, ArrowRight, Loader2, Plus, FileUp, Send, NotebookPen } from "lucide-react";
 import api from "@/lib/api";
 import { formatAUD, formatMoney } from "@/lib/projectUtils";
+import { ProjectFormDialog } from "@/components/ProjectFormDialog";
 import {
   InspectionsWidget, OverdueInvoicesWidget, TradeWarningsWidget,
   UpcomingTasksWidget, ClaimsSnapshotWidget, PortfolioList,
@@ -19,12 +21,38 @@ const StatCard = ({ icon: Icon, label, value, sub, testId }) => (
   </div>
 );
 
+const QuickAction = ({ icon: Icon, label, sub, onClick, testId }) => (
+  <button data-testid={testId} onClick={onClick}
+    className="flex items-center gap-3 rounded-md border border-slate-700 bg-card px-4 py-3 text-left hover:border-amber-500/60 hover:bg-slate-800/60 transition-colors duration-200 group">
+    <div className="h-9 w-9 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 transition-colors duration-200">
+      <Icon className="h-5 w-5 text-amber-400" aria-hidden="true" />
+    </div>
+    <div>
+      <p className="text-sm font-medium text-slate-200">{label}</p>
+      <p className="text-[11px] text-slate-500">{sub}</p>
+    </div>
+  </button>
+);
+
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
 
   useEffect(() => {
     api.get("/dashboard").then(({ data: d }) => setData(d)).catch(() => {});
   }, []);
+
+  // Quick actions land on the most recent active project (dashboard portfolio is newest-first)
+  const targetProject = data?.portfolio?.find((p) => p.status === "active") || data?.portfolio?.[0];
+  const goToProjectTab = (tabKey) => {
+    if (!targetProject) {
+      toast.info("Create a project first — quick actions work inside a project.");
+      setProjectFormOpen(true);
+      return;
+    }
+    navigate(`/projects/${targetProject.id}?tab=${tabKey}`);
+  };
 
   if (!data) {
     return (
@@ -44,7 +72,18 @@ export default function DashboardPage() {
   return (
     <main className="max-w-7xl mx-auto px-6 py-12" data-testid="dashboard-page">
       <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Overview</p>
-      <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100 mb-10">Dashboard</h1>
+      <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100 mb-6">Dashboard</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10" data-testid="quick-actions-row">
+        <QuickAction icon={Plus} label="New Project" sub="Roadmap auto-generated" testId="quick-action-new-project"
+          onClick={() => setProjectFormOpen(true)} />
+        <QuickAction icon={FileUp} label="Upload Plans" sub="AI reads your drawings" testId="quick-action-upload-plans"
+          onClick={() => goToProjectTab("planner")} />
+        <QuickAction icon={Send} label="Request Quote" sub="Send a trade a quote link" testId="quick-action-request-quote"
+          onClick={() => goToProjectTab("quotes")} />
+        <QuickAction icon={NotebookPen} label="Add Diary Entry" sub="Weather, crew and notes" testId="quick-action-diary-entry"
+          onClick={() => goToProjectTab("diary")} />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <StatCard icon={FolderKanban} label="Projects" value={portfolio.length} testId="stat-total-projects" />
@@ -75,6 +114,9 @@ export default function DashboardPage() {
           <PortfolioList portfolio={portfolio} />
         </div>
       </div>
+
+      <ProjectFormDialog open={projectFormOpen} onOpenChange={setProjectFormOpen}
+        onSaved={(p) => navigate(`/projects/${p.id}`)} />
     </main>
   );
 }

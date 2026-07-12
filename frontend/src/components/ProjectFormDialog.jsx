@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ const Field = ({ label, children, className = "" }) => (
 );
 
 export const ProjectFormDialog = ({ open, onOpenChange, project, onSaved }) => {
+  const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const isEdit = Boolean(project);
@@ -55,7 +57,17 @@ export const ProjectFormDialog = ({ open, onOpenChange, project, onSaved }) => {
       const { data } = isEdit
         ? await api.put(`/projects/${project.id}`, payload)
         : await api.post("/projects", payload);
-      toast.success(isEdit ? "Project updated" : "Project created — Victorian roadmap generated");
+      if (isEdit) {
+        toast.success("Project updated");
+      } else {
+        toast.success("Project created — Victorian roadmap generated", {
+          duration: 8000,
+          action: {
+            label: "Plan with AI →",
+            onClick: () => navigate(`/projects/${data.id}?tab=planner`),
+          },
+        });
+      }
       onOpenChange(false);
       onSaved?.(data);
     } catch (err) {

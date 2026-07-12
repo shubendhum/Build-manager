@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut, Hammer, BookOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
@@ -32,6 +33,7 @@ export const AppShell = () => {
             <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mt-1">Victorian Builds</p>
           </div>
         </div>
+        <GlobalSearch />
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={linkClass} data-testid={item.testId}>
@@ -54,7 +56,7 @@ export const AppShell = () => {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-slate-900/85 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+      <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-slate-900/85 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-y-2">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-md bg-amber-500 flex items-center justify-center">
             <HardHat className="h-4 w-4 text-slate-950" aria-hidden="true" />
@@ -71,6 +73,9 @@ export const AppShell = () => {
           <button data-testid="logout-button-mobile" onClick={logout} className="p-2 rounded-md text-slate-400 hover:text-amber-400">
             <LogOut className="h-5 w-5" aria-hidden="true" />
           </button>
+        </div>
+        <div className="w-full">
+          <GlobalSearch compact />
         </div>
       </header>
 
