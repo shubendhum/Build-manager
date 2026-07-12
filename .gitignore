@@ -90,3 +90,5 @@ mobile/.metro-cache/
 credentials.json
 *.key
 .credentials
+frontend/build/
+frontend/package-lock.json
