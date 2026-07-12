@@ -234,8 +234,258 @@ async def seed_estimates_and_dashboard():
         {"$set": {"due_date": d(-3), "updated_at": now_iso()}})
 
 
+# ---------------------------------------------------------------------------
+# PRECOMPUTED SEED ANALYSES — the analysis text below was written by hand so
+# that seeding is fast, free and idempotent (no LLM call at startup). Each
+# record mimics the exact schema produced by run_ai_analysis() in server.py.
+# Every NEW photo uploaded through POST /api/photos/analyze ALWAYS goes
+# through the real vision model — nothing at runtime is mocked.
+# ---------------------------------------------------------------------------
+SEED_PHOTO_SPECS = [
+    {
+        "asset": "site_preparation.jpg",
+        "days_ago": 78,
+        "stage_hint": "site-preparation",
+        "analysis": {
+            "identified_stage": "site-preparation",
+            "progress_notes": (
+                "Site establishment underway at the Wattle Grove Court block. The building envelope has been "
+                "cleared and stripped of topsoil, with the excavator completing the bulk cut for the slab platform. "
+                "Temporary site access is in place and the block is draining well with no standing water."
+            ),
+            "observations": [
+                "Tracked excavator on site completing cut-and-fill works",
+                "Topsoil stripped and stockpiled at the rear of the block",
+                "Building platform levelled and compacted, ready for set-out",
+                "Clear machine access maintained along the frontage",
+            ],
+            "potential_issues": [],
+            "confidence": "high",
+        },
+    },
+    {
+        "asset": "slab_pour.jpg",
+        "days_ago": 55,
+        "stage_hint": "base/slab",
+        "analysis": {
+            "identified_stage": "base/slab",
+            "progress_notes": (
+                "Concrete pour in progress for the slab. Steel reinforcement and edge formwork are correctly "
+                "positioned, and the crew is screeding and hand-trowelling the surface as the pour advances. "
+                "Plumbing penetrations are sleeved and appear to align with the hydraulic layout."
+            ),
+            "observations": [
+                "Concrete placement and hand trowelling in progress",
+                "Reinforcement mesh visible with correct cover in placed sections",
+                "Edge formwork straight and well braced",
+                "PVC plumbing penetrations sleeved through the slab zone",
+            ],
+            "potential_issues": [
+                "Exposed reinforcement bar ends near the edge beam are not capped — fit rebar caps to remove the impalement hazard",
+            ],
+            "confidence": "high",
+        },
+    },
+    {
+        "asset": "frame_carpentry.jpg",
+        "days_ago": 18,
+        "stage_hint": "frame",
+        "analysis": {
+            "identified_stage": "frame",
+            "progress_notes": (
+                "Frame carpentry progressing with door and window head trimming underway. Dressed timber components "
+                "are being planed and fitted at the saw stools, and joinery cuts are clean with tight tolerances. "
+                "The work area is orderly with hand and power tools in good condition."
+            ),
+            "observations": [
+                "Dressed timber sections planed and fitted on saw stools",
+                "Clean, square joinery cuts indicating good workmanship",
+                "Cordless drill and hand plane in use — tooling in good order",
+            ],
+            "potential_issues": [],
+            "confidence": "medium",
+        },
+    },
+    {
+        "asset": "frame_complete.jpg",
+        "days_ago": 4,
+        "stage_hint": "frame",
+        "analysis": {
+            "identified_stage": "frame",
+            "progress_notes": (
+                "Wall and roof framing is structurally complete with bracing panels fixed and roof sarking installed "
+                "ahead of the roof covering. Gable and hip framing lines read straight and true. The frame is ready "
+                "for the mandatory frame inspection before lockup trades commence."
+            ),
+            "observations": [
+                "Structural bracing panels fixed to external wall frames",
+                "Roof sarking installed over hip and gable roof framing",
+                "Framing timber stacked on level dunnage beside the dwelling",
+                "Window and door openings framed square",
+            ],
+            "potential_issues": [
+                "Spoil and offcuts heaped close to the site access path — clear to maintain safe access",
+                "No edge protection visible at roof level — install before roof covering works begin",
+            ],
+            "confidence": "high",
+        },
+    },
+]
+
+SEED_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "seed_assets")
+UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+
+
+async def seed_photos():
+    """Phase 4 seed: demo progress photos with PRECOMPUTED analyses (see note above). Idempotent."""
+    if await db.photo_analyses.find_one({"is_seed": True}):
+        return
+    project = await db.projects.find_one({"name": DEMO_PROJECT_NAME, "is_seed": True})
+    if not project:
+        return
+    import shutil
+    now = datetime.now(timezone.utc)
+    for spec in SEED_PHOTO_SPECS:
+        src = os.path.join(SEED_ASSETS_DIR, spec["asset"])
+        if not os.path.exists(src):
+            continue
+        photo_id = str(uuid.uuid4())
+        dest = os.path.join(UPLOADS_DIR, f"{photo_id}.jpg")
+        shutil.copyfile(src, dest)
+        created = (now - timedelta(days=spec["days_ago"], hours=3)).isoformat()
+        await db.photo_analyses.insert_one({
+            "id": photo_id,
+            "is_seed": True,
+            "filename": spec["asset"],
+            "project_id": project["id"],
+            "stage_hint": spec["stage_hint"],
+            "notes": None,
+            "analysis": dict(spec["analysis"]),
+            "image_url": f"/api/photos/{photo_id}/image",
+            "created_at": created,
+            "file_path": dest,
+            "media_type": "image/jpeg",
+        })
+
+
+def _write_seed_pdf(path, title, lines):
+    """Generate a small but real PDF for a seed document using reportlab."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as pdfcanvas
+    c = pdfcanvas.Canvas(path, pagesize=A4)
+    w, h = A4
+    c.setFillColorRGB(0.12, 0.16, 0.23)
+    c.rect(0, h - 30 * mm, w, 30 * mm, fill=1, stroke=0)
+    c.setFillColorRGB(0.96, 0.62, 0.04)
+    c.setFont("Helvetica-Bold", 15)
+    c.drawString(20 * mm, h - 18 * mm, title)
+    c.setFillColorRGB(0.86, 0.89, 0.94)
+    c.setFont("Helvetica", 9)
+    c.drawString(20 * mm, h - 25 * mm, "Hartley Constructions Pty Ltd — Registered Building Practitioner DB-U 45821")
+    c.setFillColorRGB(0.2, 0.25, 0.33)
+    y = h - 45 * mm
+    for line in lines:
+        if line.startswith("** "):
+            c.setFont("Helvetica-Bold", 10)
+            line = line[3:]
+        else:
+            c.setFont("Helvetica", 10)
+        c.drawString(20 * mm, y, line)
+        y -= 6.5 * mm
+    c.setFont("Helvetica-Oblique", 8)
+    c.setFillColorRGB(0.45, 0.5, 0.58)
+    c.drawString(20 * mm, 15 * mm, "Sample document generated for demonstration — BuildManager VIC")
+    c.save()
+
+
+async def seed_documents():
+    """Phase 4 seed: three real PDF documents for the demo project. Idempotent."""
+    if await db.documents.find_one({"is_seed": True}):
+        return
+    project = await db.projects.find_one({"name": DEMO_PROJECT_NAME, "is_seed": True})
+    if not project:
+        return
+    docs_dir = os.path.join(UPLOADS_DIR, "documents")
+    os.makedirs(docs_dir, exist_ok=True)
+    now = datetime.now(timezone.utc)
+    address = "14 Wattle Grove Court, Ballarat West VIC 3350"
+
+    specs = [
+        {
+            "title": "Working Drawings — Rev C",
+            "category": "drawings",
+            "filename": "wattle-grove-working-drawings-revC.pdf",
+            "notes": "Issued for construction 09/2025.",
+            "days_ago": 140,
+            "pdf_title": "WORKING DRAWINGS — REV C",
+            "lines": [
+                f"Project: {DEMO_PROJECT_NAME}", f"Site: {address}", "Client: Sarah & Tom Mitchell", "",
+                "** Drawing register", "A01  Site plan & setbacks            1:200", "A02  Floor plan                      1:100",
+                "A03  Elevations (N/S/E/W)            1:100", "A04  Sections & construction details 1:50",
+                "A05  Window & door schedule", "E01  Electrical layout               1:100",
+                "H01  Hydraulic layout                1:100", "", "Issued for construction — September 2025.",
+            ],
+        },
+        {
+            "title": "Building Permit BP-2025-04471",
+            "category": "permits",
+            "filename": "building-permit-BP-2025-04471.pdf",
+            "notes": "Issued by the relevant building surveyor.",
+            "days_ago": 132,
+            "pdf_title": "BUILDING PERMIT — BP-2025-04471",
+            "lines": [
+                "** Permit details",
+                f"Property: {address}", "Description: Construction of a single-storey dwelling (4BR)",
+                "Building classification: Class 1a", "Cost of works: $620,000.00",
+                "Builder: Hartley Constructions Pty Ltd (DB-U 45821)", "",
+                "** Relevant Building Surveyor", "P. Whitfield — RBS-U 1204, Ballarat Building Surveyors Pty Ltd", "",
+                "** Mandatory notification stages", "1. Prior to placing footings / slab (Base)",
+                "2. Completion of framework (Frame)", "3. Waterproofing of wet areas (Fixing)",
+                "4. Final — on completion of all building work",
+            ],
+        },
+        {
+            "title": "Domestic Building Insurance Certificate",
+            "category": "insurance",
+            "filename": "dbi-certificate-HIA-DBI-2025-88431.pdf",
+            "notes": "Policy HIA-DBI-2025-88431, expires 30/06/2027.",
+            "days_ago": 138,
+            "pdf_title": "DOMESTIC BUILDING INSURANCE CERTIFICATE",
+            "lines": [
+                "** Certificate of insurance",
+                "Policy number: HIA-DBI-2025-88431", "Builder: Hartley Constructions Pty Ltd (DB-U 45821)",
+                f"Insured works: New single-storey dwelling at {address}",
+                "Building owner: Sarah & Tom Mitchell", "Contract value: $620,000.00",
+                "Policy expiry: 30/06/2027", "",
+                "This policy provides cover as required under the Building Act 1993 (Vic)",
+                "for non-completion and defective works, subject to policy terms.",
+            ],
+        },
+    ]
+    for spec in specs:
+        doc_id = str(uuid.uuid4())
+        path = os.path.join(docs_dir, f"{doc_id}.pdf")
+        _write_seed_pdf(path, spec["pdf_title"], spec["lines"])
+        await db.documents.insert_one({
+            "id": doc_id,
+            "is_seed": True,
+            "project_id": project["id"],
+            "title": spec["title"],
+            "category": spec["category"],
+            "notes": spec["notes"],
+            "filename": spec["filename"],
+            "file_size": os.path.getsize(path),
+            "media_type": "application/pdf",
+            "uploaded_at": (now - timedelta(days=spec["days_ago"])).isoformat(),
+            "file_path": path,
+        })
+
+
 async def seed_all():
     await seed_user()
     await seed_demo_project()
     await seed_trades_and_finance()
     await seed_estimates_and_dashboard()
+    await seed_photos()
+    await seed_documents()

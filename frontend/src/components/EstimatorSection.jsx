@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Calculator } from "lucide-react";
+import { Plus, Pencil, Trash2, Calculator, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { EstimateLineDialog } from "@/components/EstimateLineDialog";
-import api from "@/lib/api";
+import api, { readBlobError, downloadBlob } from "@/lib/api";
 import { formatMoney, roadmapStageLabel } from "@/lib/projectUtils";
 
 export const EstimatorSection = ({ project, onChanged }) => {
@@ -46,6 +46,16 @@ export const EstimatorSection = ({ project, onChanged }) => {
     }
   };
 
+  const exportPdf = async () => {
+    try {
+      const { data: blob } = await api.get(`/projects/${project.id}/estimate.pdf`, { responseType: "blob", timeout: 60000 });
+      downloadBlob(blob, `Estimate-${project.name.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`);
+      toast.success("Estimate PDF downloaded.");
+    } catch (e) {
+      toast.error(await readBlobError(e));
+    }
+  };
+
   if (!data) return <p className="text-sm text-slate-400">Loading estimate…</p>;
   const { lines, summary } = data;
   const marginPositive = summary.margin >= 0;
@@ -58,10 +68,16 @@ export const EstimatorSection = ({ project, onChanged }) => {
           <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Cost Estimator</h3>
           <span className="text-xs text-slate-500">{lines.length} line{lines.length === 1 ? "" : "s"}</span>
         </div>
-        <Button data-testid="add-estimate-line-button" onClick={() => { setEditing(null); setFormOpen(true); }}
-          className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
-          <Plus className="h-4 w-4" aria-hidden="true" /> Add Line
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button data-testid="export-estimate-pdf-button" variant="outline" onClick={exportPdf} disabled={lines.length === 0}
+            className="border-amber-500/50 bg-transparent text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 font-heading font-bold uppercase tracking-wider">
+            <FileDown className="h-4 w-4" aria-hidden="true" /> Export Estimate PDF
+          </Button>
+          <Button data-testid="add-estimate-line-button" onClick={() => { setEditing(null); setFormOpen(true); }}
+            className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
+            <Plus className="h-4 w-4" aria-hidden="true" /> Add Line
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">

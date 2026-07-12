@@ -10,10 +10,10 @@ import { ProjectTradesTab } from "@/components/ProjectTradesTab";
 import { QuotesTab } from "@/components/QuotesTab";
 import { InvoicesTab } from "@/components/InvoicesTab";
 import { BudgetTab } from "@/components/BudgetTab";
+import { PhotosTab } from "@/components/PhotosTab";
+import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
-
-const FUTURE_TABS = ["Photos", "Documents"];
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -82,11 +82,8 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
           <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
           <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
-          {FUTURE_TABS.map((t) => (
-            <TabsTrigger key={t} value={t.toLowerCase()} disabled data-testid={`tab-${t.toLowerCase()}`} className="opacity-40">
-              {t}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="photos" data-testid="tab-photos">Photos</TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-6">
           <ProjectOverview project={project} onChanged={fetchProject} />
@@ -105,6 +102,12 @@ export default function ProjectDetailPage() {
         </TabsContent>
         <TabsContent value="budget" className="mt-6">
           <BudgetTab project={project} />
+        </TabsContent>
+        <TabsContent value="photos" className="mt-6">
+          <PhotosTab project={project} />
+        </TabsContent>
+        <TabsContent value="documents" className="mt-6">
+          <DocumentsTab projectId={project.id} />
         </TabsContent>
       </Tabs>
     </main>

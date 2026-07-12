@@ -41,4 +41,29 @@ export const formatApiErrorDetail = (detail) => {
   return String(detail);
 };
 
+// Extract an error message from a failed blob (file download) request
+export const readBlobError = async (error) => {
+  try {
+    const data = error.response?.data;
+    if (data instanceof Blob) {
+      const parsed = JSON.parse(await data.text());
+      return formatApiErrorDetail(parsed.detail);
+    }
+    return formatApiErrorDetail(data?.detail);
+  } catch {
+    return "Download failed. Please try again.";
+  }
+};
+
+export const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
 export default api;

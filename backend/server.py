@@ -30,6 +30,8 @@ from rates import rates_router, ensure_reference_rates  # noqa: E402
 from estimates import estimates_router  # noqa: E402
 from budget import budget_router  # noqa: E402
 from dashboard import dashboard_router  # noqa: E402
+from documents import documents_router  # noqa: E402
+from reports import reports_router  # noqa: E402
 from seed import seed_all  # noqa: E402
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
@@ -147,7 +149,7 @@ async def run_ai_analysis(image_b64: str, stage_hint: Optional[str], notes: Opti
 
 @api_router.get("/")
 async def root():
-    return {"message": "BuildManager VIC API - Phase 0"}
+    return {"message": "BuildManager VIC API"}
 
 
 @api_router.post("/photos/analyze", response_model=PhotoAnalysisRecord)
@@ -238,6 +240,17 @@ async def get_photo_image(photo_id: str, user: dict = Depends(get_current_user))
     return FileResponse(file_path, media_type=doc.get('media_type', 'image/jpeg'))
 
 
+@api_router.delete("/photos/{photo_id}")
+async def delete_photo(photo_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.photo_analyses.find_one({"id": photo_id}, {"_id": 0, "file_path": 1})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    if doc.get("file_path"):
+        Path(doc["file_path"]).unlink(missing_ok=True)
+    await db.photo_analyses.delete_one({"id": photo_id})
+    return {"message": "Photo deleted."}
+
+
 app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(tasks_router)
@@ -249,6 +262,8 @@ app.include_router(rates_router)
 app.include_router(estimates_router)
 app.include_router(budget_router)
 app.include_router(dashboard_router)
+app.include_router(documents_router)
+app.include_router(reports_router)
 app.include_router(api_router)
 
 

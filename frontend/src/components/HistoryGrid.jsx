@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, History } from "lucide-react";
 import { stageLabel, CONFIDENCE_STYLES } from "@/lib/stages";
+import { formatDateTime } from "@/lib/projectUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -54,7 +55,7 @@ export const HistoryGrid = ({ history, loading }) => {
                 )}
               </div>
               <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{item.analysis.progress_notes}</p>
-              <p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
+              <p className="text-xs text-slate-500">{formatDateTime(item.created_at)}</p>
             </div>
           </motion.article>
         ))}

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Eye, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { stageLabel, CONFIDENCE_STYLES } from "@/lib/stages";
+import { formatDateTime } from "@/lib/projectUtils";
 
 export const AnalysisResult = ({ result }) => {
   const { analysis } = result;
@@ -20,7 +21,7 @@ export const AnalysisResult = ({ result }) => {
         <Badge data-testid="result-confidence-badge" variant="outline" className={`uppercase tracking-wider text-[10px] ${CONFIDENCE_STYLES[analysis.confidence] || CONFIDENCE_STYLES.medium}`}>
           {analysis.confidence} confidence
         </Badge>
-        <span className="ml-auto text-xs text-slate-500">{new Date(result.created_at).toLocaleString()}</span>
+        <span className="ml-auto text-xs text-slate-500">{formatDateTime(result.created_at)}</span>
       </div>
 
       <div className="p-6 space-y-6">

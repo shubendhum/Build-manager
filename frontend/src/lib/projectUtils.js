@@ -41,7 +41,7 @@ export const typeLabel = (v) => PROJECT_TYPES.find((t) => t.value === v)?.label 
 export const statusLabel = (v) => PROJECT_STATUSES.find((s) => s.value === v)?.label || v;
 
 export const formatAUD = (value) =>
-  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(value || 0);
+  new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
 
 export const formatMoney = (value) =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
@@ -62,8 +62,16 @@ export const HEALTH_LABELS = {
 
 export const formatDate = (iso) => {
   if (!iso) return "—";
-  const d = new Date(`${iso}T00:00:00`);
-  return isNaN(d) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  const d = iso.includes("T") ? new Date(iso) : new Date(`${iso}T00:00:00`);
+  return isNaN(d) ? iso : d.toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+export const formatDateTime = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d)
+    ? iso
+    : d.toLocaleString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
 };
 
 export const isOverdue = (task) =>
