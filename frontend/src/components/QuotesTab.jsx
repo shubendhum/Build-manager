@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, CheckCircle2, Paperclip, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, CheckCircle2, Paperclip, FileText, Send, Copy, XCircle, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,9 +8,10 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { QuoteFormDialog } from "@/components/QuoteFormDialog";
+import { RfqDialog, copyRfqLink } from "@/components/RfqDialog";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { formatMoney, formatDate, roadmapStageLabel } from "@/lib/projectUtils";
-import { QUOTE_STATUS_STYLES } from "@/lib/tradeUtils";
+import { QUOTE_STATUS_STYLES, RFQ_STATUS_STYLES } from "@/lib/tradeUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -38,10 +39,18 @@ const QuoteCard = ({ quote, onAccept, onEdit, onDelete, onUploaded }) => {
           <p className="font-heading font-bold text-slate-100">{quote.trade_name || "Unknown trade"}</p>
           <p className="text-xs text-slate-500">{roadmapStageLabel(quote.stage_key)} stage</p>
         </div>
-        <Badge variant="outline" className={`shrink-0 uppercase tracking-wider text-[10px] ${QUOTE_STATUS_STYLES[quote.status]}`}
-          data-testid={`quote-status-${quote.id}`}>
-          {quote.status}
-        </Badge>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Badge variant="outline" className={`uppercase tracking-wider text-[10px] ${QUOTE_STATUS_STYLES[quote.status]}`}
+            data-testid={`quote-status-${quote.id}`}>
+            {quote.status}
+          </Badge>
+          {quote.source === "portal" && (
+            <Badge variant="outline" className="bg-violet-500/15 text-violet-400 border-violet-500/40 uppercase tracking-wider text-[10px]"
+              data-testid={`quote-portal-badge-${quote.id}`}>
+              <Globe className="h-3 w-3 mr-1" aria-hidden="true" /> Submitted via portal
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="rounded-md bg-slate-800/40 border border-slate-700/70 px-3 py-2 mb-3 text-xs text-slate-300 space-y-0.5">
@@ -54,6 +63,14 @@ const QuoteCard = ({ quote, onAccept, onEdit, onDelete, onUploaded }) => {
         {quote.expiry_date && <p>Valid until {formatDate(quote.expiry_date)}</p>}
         {quote.scope_description && <p className="text-slate-300 line-clamp-3">{quote.scope_description}</p>}
         {quote.exclusions && <p className="text-slate-500 line-clamp-2">Excl: {quote.exclusions}</p>}
+        {quote.lead_time && <p>Lead time: {quote.lead_time}</p>}
+        {quote.source === "portal" && quote.contact_name && (
+          <p className="text-slate-500">
+            Contact: {quote.contact_name}
+            {quote.contact_phone && ` · ${quote.contact_phone}`}
+            {quote.contact_email && ` · ${quote.contact_email}`}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-700/70">
@@ -109,24 +126,82 @@ const QuoteCard = ({ quote, onAccept, onEdit, onDelete, onUploaded }) => {
   );
 };
 
+const RfqList = ({ rfqs, onClose }) => {
+  if (rfqs.length === 0) return null;
+  return (
+    <section className="mb-10" data-testid="rfq-list">
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Quote Requests</h3>
+        <span className="text-xs text-slate-500">{rfqs.length} sent</span>
+      </div>
+      <div className="rounded-md border border-slate-700 bg-card divide-y divide-slate-800">
+        {rfqs.map((rfq) => (
+          <div key={rfq.id} className="flex flex-wrap items-center gap-3 px-4 py-3" data-testid={`rfq-row-${rfq.id}`}>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-200 truncate">{rfq.trade_name || "Unknown trade"}</p>
+              <p className="text-xs text-slate-500 truncate">
+                {rfq.scope.split("\n")[0]}
+                {rfq.due_date && <span> · due {formatDate(rfq.due_date)}</span>}
+              </p>
+            </div>
+            <Badge variant="outline" className={`uppercase tracking-wider text-[10px] shrink-0 ${RFQ_STATUS_STYLES[rfq.status]}`}
+              data-testid={`rfq-status-${rfq.id}`}>
+              {rfq.status}
+            </Badge>
+            {rfq.status !== "closed" && (
+              <button data-testid={`rfq-copy-${rfq.id}`} onClick={() => copyRfqLink(rfq)} title="Copy public link"
+                className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 transition-colors duration-200">
+                <Copy className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+            {rfq.status === "sent" && (
+              <button data-testid={`rfq-close-${rfq.id}`} onClick={() => onClose(rfq)} title="Close request"
+                className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200">
+                <XCircle className="h-4 w-4" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 export const QuotesTab = ({ projectId }) => {
   const [quotes, setQuotes] = useState([]);
   const [trades, setTrades] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [rfqOpen, setRfqOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [q, t] = await Promise.all([api.get(`/projects/${projectId}/quotes`), api.get("/trades")]);
+      const [q, t, r] = await Promise.all([
+        api.get(`/projects/${projectId}/quotes`),
+        api.get("/trades"),
+        api.get(`/projects/${projectId}/rfqs`),
+      ]);
       setQuotes(q.data);
       setTrades(t.data);
+      setRfqs(r.data);
     } finally {
       setLoading(false);
     }
   }, [projectId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const closeRfq = async (rfq) => {
+    try {
+      await api.post(`/rfqs/${rfq.id}/close`);
+      toast.success("Quote request closed — the public link is now disabled.");
+      fetchData();
+    } catch (e) {
+      toast.error("Failed to close quote request.");
+    }
+  };
 
   const accept = async (quote) => {
     try {
@@ -155,7 +230,11 @@ export const QuotesTab = ({ projectId }) => {
 
   return (
     <div data-testid="quotes-tab">
-      <div className="flex justify-end mb-6">
+      <div className="flex flex-wrap justify-end gap-3 mb-6">
+        <Button data-testid="request-quote-button" variant="outline" onClick={() => setRfqOpen(true)}
+          className="border-amber-500/50 bg-transparent text-amber-400 hover:bg-amber-500/10 hover:text-amber-300 font-heading font-bold uppercase tracking-wider">
+          <Send className="h-4 w-4" aria-hidden="true" /> Request Quote
+        </Button>
         <Button data-testid="add-quote-button" onClick={() => { setEditing(null); setFormOpen(true); }}
           className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
           <Plus className="h-4 w-4" aria-hidden="true" /> Add Quote
@@ -163,8 +242,12 @@ export const QuotesTab = ({ projectId }) => {
       </div>
 
       {loading && <p className="text-sm text-slate-400">Loading quotes…</p>}
+      {!loading && <RfqList rfqs={rfqs} onClose={closeRfq} />}
       {!loading && quotes.length === 0 && (
-        <p className="text-sm text-slate-500" data-testid="quotes-empty">No quotes yet. Add quotes and compare them by work package.</p>
+        <div className="rounded-md border border-slate-700 bg-slate-800/30 p-10 text-center" data-testid="quotes-empty">
+          <p className="text-sm text-slate-400 mb-1">No quotes yet.</p>
+          <p className="text-xs text-slate-500">Add quotes manually, or send a trade a Request Quote link and their submission will land here automatically.</p>
+        </div>
       )}
 
       <div className="space-y-10">
@@ -190,6 +273,7 @@ export const QuotesTab = ({ projectId }) => {
       </div>
 
       <QuoteFormDialog open={formOpen} onOpenChange={setFormOpen} projectId={projectId} quote={editing} trades={trades} onSaved={fetchData} />
+      <RfqDialog open={rfqOpen} onOpenChange={setRfqOpen} projectId={projectId} trades={trades} onSaved={fetchData} />
     </div>
   );
 };

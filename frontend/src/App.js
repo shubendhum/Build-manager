@@ -11,6 +11,7 @@ import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import TradesPage from "@/pages/TradesPage";
 import RateGuidePage from "@/pages/RateGuidePage";
 import AnalyzePage from "@/pages/AnalyzePage";
+import QuotePortalPage from "@/pages/QuotePortalPage";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/quote/:token" element={<QuotePortalPage />} />
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/projects" element={<ProjectsPage />} />

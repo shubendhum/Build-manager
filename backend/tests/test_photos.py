@@ -8,7 +8,7 @@ from PIL import Image
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
 CONSTRUCTION_PHOTO = "/tmp/construction_frame.jpg"
-CREDS = {"email": "pm@buildmanagervic.com.au", "password": "SitePM-2026"}
+CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
 
 VALID_STAGES = {'site-preparation', 'base/slab', 'frame', 'lockup', 'fixing', 'completion', 'external-works', 'unknown'}
 VALID_CONFIDENCE = {'low', 'medium', 'high'}

@@ -1,6 +1,6 @@
 """Backend tests for BuildManager VIC Phase 2 - Trades, Quotes, Invoices, Claims.
 
-Reuses seeded pm@buildmanagervic.com.au / SitePM-2026 and seeded project 'Residence - Ballarat West'.
+Reuses seeded pm@rldtech.com.au / SitePM-2026 and seeded project 'Residence - Ballarat West'.
 Restores all seed state at teardown.
 """
 import os
@@ -12,7 +12,7 @@ from PIL import Image
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
-CREDS = {"email": "pm@buildmanagervic.com.au", "password": "SitePM-2026"}
+CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
 
 
 @pytest.fixture(scope="module")

@@ -19,6 +19,7 @@ export const tradeTypeLabel = (v) => TRADE_TYPES.find((t) => t.value === v)?.lab
 
 export const QUOTE_STATUSES = [
   { value: "pending", label: "Pending" },
+  { value: "submitted", label: "Submitted" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
   { value: "expired", label: "Expired" },
@@ -26,9 +27,16 @@ export const QUOTE_STATUSES = [
 
 export const QUOTE_STATUS_STYLES = {
   pending: "bg-sky-500/15 text-sky-400 border-sky-500/40",
+  submitted: "bg-violet-500/15 text-violet-400 border-violet-500/40",
   accepted: "bg-emerald-600/20 text-emerald-400 border-emerald-600/40",
   rejected: "bg-red-500/15 text-red-400 border-red-500/40",
   expired: "bg-slate-500/15 text-slate-400 border-slate-500/40",
+};
+
+export const RFQ_STATUS_STYLES = {
+  sent: "bg-sky-500/15 text-sky-400 border-sky-500/40",
+  submitted: "bg-emerald-600/20 text-emerald-400 border-emerald-600/40",
+  closed: "bg-slate-500/15 text-slate-400 border-slate-500/40",
 };
 
 export const INVOICE_STATUS_STYLES = {

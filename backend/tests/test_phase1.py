@@ -1,6 +1,6 @@
 """Backend tests for BuildManager VIC Phase 1 - Auth, Projects, Tasks, Photos with project filtering.
 
-Reuses seeded user pm@buildmanagervic.com.au / SitePM-2026 and seeded project 'Residence - Ballarat West'.
+Reuses seeded user pm@rldtech.com.au / SitePM-2026 and seeded project 'Residence - Ballarat West'.
 Avoids triggering brute-force lockout - only uses correct password for the seeded email.
 """
 import os
@@ -12,7 +12,7 @@ from PIL import Image
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
-CREDS = {"email": "pm@buildmanagervic.com.au", "password": "SitePM-2026"}
+CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
 CONSTRUCTION_PHOTO = "/tmp/construction_frame.jpg"
 
 

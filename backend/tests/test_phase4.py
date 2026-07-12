@@ -1,6 +1,6 @@
 """Backend tests for BuildManager VIC Phase 4 - Documents, Site Diary PDF, Estimate PDF, Photo delete.
 
-Uses seeded user pm@buildmanagervic.com.au / SitePM-2026 and project 'Residence - Ballarat West'.
+Uses seeded user pm@rldtech.com.au / SitePM-2026 and project 'Residence - Ballarat West'.
 Does NOT call the real LLM (no photo analyze here — that's test_photos.py).
 """
 import os
@@ -11,7 +11,7 @@ import requests
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
-CREDS = {"email": "pm@buildmanagervic.com.au", "password": "SitePM-2026"}
+CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
 
 
 @pytest.fixture(scope="module")

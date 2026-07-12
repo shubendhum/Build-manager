@@ -11,7 +11,7 @@ from roadmap_template import STAGE_KEYS
 
 quotes_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
-QUOTE_STATUSES = {"pending", "accepted", "rejected", "expired"}
+QUOTE_STATUSES = {"pending", "submitted", "accepted", "rejected", "expired"}
 ATTACH_TYPES = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 MAX_ATTACH_BYTES = 10 * 1024 * 1024
 QUOTE_UPLOAD_DIR = Path(__file__).parent / "uploads" / "quotes"
