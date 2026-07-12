@@ -26,6 +26,10 @@ from trades import trades_router  # noqa: E402
 from quotes import quotes_router  # noqa: E402
 from invoices import invoices_router  # noqa: E402
 from claims import claims_router  # noqa: E402
+from rates import rates_router, ensure_reference_rates  # noqa: E402
+from estimates import estimates_router  # noqa: E402
+from budget import budget_router  # noqa: E402
+from dashboard import dashboard_router  # noqa: E402
 from seed import seed_all  # noqa: E402
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
@@ -241,6 +245,10 @@ app.include_router(trades_router)
 app.include_router(quotes_router)
 app.include_router(invoices_router)
 app.include_router(claims_router)
+app.include_router(rates_router)
+app.include_router(estimates_router)
+app.include_router(budget_router)
+app.include_router(dashboard_router)
 app.include_router(api_router)
 
 
@@ -249,6 +257,7 @@ async def on_startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.tasks.create_index([("project_id", 1), ("sort_order", 1)])
+    await ensure_reference_rates()
     await seed_all()
 
 

@@ -1,0 +1,22 @@
+{
+  "summary": "Phase 3 (Rate Guide, Cost Estimator, Budget Tracking, Dashboard) fully verified. Backend: 11/11 pytest tests pass in /app/backend/tests/test_phase3.py covering rates CRUD + reset + auth guard + invalid trade_type; estimate summary exact match (subtotal 403830, gst 40383, contingency 12.5%/50478.75, grand 494691.75, margin 125308.25 / 20.2%); estimate line CRUD + validation (negative qty, bad stage_key, contingency out-of-range all return 400); budget by_stage (lockup committed 31240 / invoiced 18700 / paid 10000; unallocated invoiced 44660 / paid 20460), by_work_package (Electrical 31240/18700/10000, plumbing pending committed 0), totals (estimated 444213, ec 494691.75, exposure 75900, health under); dashboard portfolio + budget_health under, progress 13, inspections (waterproofing overdue -3d sorted first, frame +5d), overdue_invoices (count 1 / 8700 / INV-0871), trade_warnings (JT Plumbing), upcoming_tasks (framing overdue), claims_snapshot next Lockup 217000. Frontend Playwright: login → dashboard renders all 4 stat cards (Overdue 1 / $8,700 outstanding), RBS reminders widget shows OVERDUE BY 3D + DUE IN 5D badges, Overdue Invoices lists INV-0871, JT Plumbing licence alert, framing task OVERDUE, Claims 'Next: Lockup — $217,000.00', Portfolio UNDER BUDGET + 13%. /rates page: disclaimer + 4 benchmark cards + 17 rows; Add TEST Custom Rate → 18 rows with Custom badge; Reset to Defaults restores 17. Budget tab: 10 estimate lines with correct totals (slab $20,700, frame $288,600), summary shows Grand $494,691.75 + green Margin $125,308.25 (20.2%); Add Line dialog picks Tiling → unit prefills 'per m²', High button sets rate 180, description auto 'Tiling', qty 10 → total preview $1,800 → saved. Budget Tracking shows UNDER BUDGET badge, Committed $31,240, Invoiced $63,360, Paid $30,460, Exposure $75,900. Cleanup: TEST tiling line deleted via API; final state = 10 lines, grand $494,691.75, contingency 12.5%, 17 reference rates, 0 customs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase3.py",
+    "/app/test_reports/pytest/phase3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "estimates.py update_line does not persist recomputed line_total to DB (it's derived on read via line_total()), which is fine and consistent; just noting for reviewers.",
+    "budget.py compute_budget uses subtotal_ex * contingency_pct / 100 (correct) but exposure formula is committed_total + unlinked_invoiced; when quotes linked to accepted invoices are underbilled the unbilled remainder is still counted via committed — verified matches spec.",
+    "dashboard.py imports compute_budget and calls it per project inside the dashboard loop (N+1 DB round-trips for estimate_lines/quotes/invoices). Acceptable at current scale but should be optimized once portfolio >20 projects."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase3.py (new)"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100%"},
+  "test_credentials": "pm@buildmanagervic.com.au / SitePM-2026",
+  "seed_data_creation": "None. TEST_ artefacts (TEST Custom Rate, TEST tiling estimate line) all removed. Contingency restored to 12.5. Plumbing quotes remain pending.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_phase3.py is idempotent (creates+deletes its own custom rate/line, restores contingency). Run with: cd /app/backend && REACT_APP_BACKEND_URL=<url> python -m pytest tests/test_phase3.py -v -o addopts=''. Note: default pytest.ini uses xdist which needs -o addopts='' override for single-worker debugging. Login lands on '/' (not '/dashboard'); the dashboard content still renders at root for authenticated users. Frontend uses data-testids per the spec (nav-rates, rate-guide-page, budget-tab, etc.) — all verified working. Radix Slider was NOT interacted with via UI (kept as-is at 12.5%); settings endpoint was tested via API instead."
+}

@@ -9,6 +9,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import TradesPage from "@/pages/TradesPage";
+import RateGuidePage from "@/pages/RateGuidePage";
 import AnalyzePage from "@/pages/AnalyzePage";
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/trades" element={<TradesPage />} />
+            <Route path="/rates" element={<RateGuidePage />} />
             <Route path="/analyzer" element={<AnalyzePage />} />
           </Route>
         </Routes>

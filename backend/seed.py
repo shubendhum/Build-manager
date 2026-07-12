@@ -185,7 +185,57 @@ async def seed_trades_and_finance():
     await db.claims.insert_many([dict(l) for l in lines])
 
 
+async def seed_estimates_and_dashboard():
+    """Phase 3 seed: estimate lines + contingency + inspection due dates for demo project. Idempotent."""
+    if await db.estimate_lines.find_one({"is_seed": True}):
+        return
+    project = await db.projects.find_one({"name": DEMO_PROJECT_NAME, "is_seed": True})
+    if not project:
+        return
+    pid = project["id"]
+    today = datetime.now(timezone.utc).date()
+
+    def d(days):
+        return (today + timedelta(days=days)).isoformat()
+
+    rates = await db.rates.find({}, {"_id": 0, "id": 1, "work_item": 1}).to_list(500)
+    rid = {r["work_item"]: r["id"] for r in rates}
+
+    # (description, stage_key, rate_work_item, quantity, unit, rate)
+    line_specs = [
+        ("Concrete slab 180 m²", "base", "Concreting — slab", 180, "m²", 115),
+        ("Timber frame complete 195 m²", "frame", "Timber frame — complete", 195, "m²", 1480),
+        ("Electrical points (85)", "lockup", "Electrical", 85, "point", 90),
+        ("Roofing — Colorbond 210 m²", "lockup", "Roofing — metal/tile", 210, "m²", 95),
+        ("Bricklaying 14,000 bricks", "lockup", "Bricklaying", 14, "per 1,000 bricks", 1650),
+        ("Plumbing fixture areas (2 bath + kitchen)", "lockup", "Plumbing — fixture area", 3, "fixture area", 1400),
+        ("Tiling wet areas + kitchen", "fixing", "Tiling", 60, "m²", 130),
+        ("Waterproofing wet areas", "fixing", "Waterproofing — wet areas", 25, "m²", 70),
+        ("Plastering walls", "fixing", "Plastering — walls", 480, "m²", 28),
+        ("Painting internal walls", "fixing", "Painting — walls", 520, "m²", 32),
+    ]
+    lines = []
+    for idx, (desc, stage, work_item, qty, unit, rate) in enumerate(line_specs):
+        lines.append({
+            "id": str(uuid.uuid4()), "is_seed": True, "project_id": pid,
+            "description": desc, "stage_key": stage, "rate_item_id": rid.get(work_item),
+            "quantity": qty, "unit": unit, "rate": rate, "gst_applicable": True,
+            "sort_order": idx * 10, "created_at": now_iso(), "updated_at": now_iso(),
+        })
+    await db.estimate_lines.insert_many([dict(l) for l in lines])
+    await db.projects.update_one({"id": pid}, {"$set": {"contingency_pct": 12.5}})
+
+    # Inspection due dates for dashboard reminders: frame inspection due soon, waterproofing overdue
+    await db.tasks.update_one(
+        {"project_id": pid, "stage_key": "frame", "is_mandatory_inspection": True},
+        {"$set": {"due_date": d(5), "updated_at": now_iso()}})
+    await db.tasks.update_one(
+        {"project_id": pid, "stage_key": "fixing", "is_mandatory_inspection": True},
+        {"$set": {"due_date": d(-3), "updated_at": now_iso()}})
+
+
 async def seed_all():
     await seed_user()
     await seed_demo_project()
     await seed_trades_and_finance()
+    await seed_estimates_and_dashboard()

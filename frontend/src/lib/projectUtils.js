@@ -46,6 +46,20 @@ export const formatAUD = (value) =>
 export const formatMoney = (value) =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0);
 
+export const HEALTH_STYLES = {
+  under: "bg-emerald-600/20 text-emerald-400 border-emerald-600/40",
+  "on-track": "bg-sky-500/15 text-sky-400 border-sky-500/40",
+  over: "bg-red-500/15 text-red-400 border-red-500/50",
+  "no-estimate": "bg-slate-500/15 text-slate-400 border-slate-500/40",
+};
+
+export const HEALTH_LABELS = {
+  under: "Under Budget",
+  "on-track": "On Track",
+  over: "Over Budget",
+  "no-estimate": "No Estimate",
+};
+
 export const formatDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(`${iso}T00:00:00`);
