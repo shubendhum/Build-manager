@@ -1,0 +1,97 @@
+{
+  "theme": "dark",
+  "typography": {
+    "headings": {
+      "fontFamily": "Barlow",
+      "weights": ["600", "700"],
+      "usage": "Use for all main titles, headers, and key numbers. Never use Inter for headings."
+    },
+    "body": {
+      "fontFamily": "Inter",
+      "weights": ["400", "500"],
+      "usage": "Use for body text, labels, and data points."
+    },
+    "instructions_to_main_agent": "Import Barlow and Inter from Google Fonts. Apply tracking-tight for headings > 32px. Use uppercase with tracking-[0.2em] for overlines and small labels."
+  },
+  "colors": {
+    "background": {
+      "main": "hsl(222.2, 47.4%, 11.2%)",
+      "card": "hsl(222.2, 47.4%, 15%)",
+      "surface": "hsl(222.2, 47.4%, 18%)",
+      "description": "Dark slate colors to provide a solid, professional construction-industry feel."
+    },
+    "primary": {
+      "main": "hsl(38, 92%, 50%)",
+      "foreground": "hsl(0, 0%, 9%)",
+      "description": "Amber accent (Warning/Construction color) for main CTAs and highlights. Ensures high visibility on dark slate."
+    },
+    "destructive": {
+      "main": "hsl(0, 84.2%, 60.2%)",
+      "foreground": "hsl(0, 0%, 98%)",
+      "description": "Use for critical issues and warnings in the analysis results."
+    },
+    "success": {
+      "main": "hsl(142.1, 76.2%, 36.3%)",
+      "foreground": "hsl(355.7, 100%, 97.3%)",
+      "description": "Use for positive progress notes and completed stage badges."
+    },
+    "border": "hsl(217.2, 32.6%, 25%)",
+    "muted": "hsl(215, 27.9%, 16.9%)",
+    "mutedForeground": "hsl(215, 20.2%, 65.1%)",
+    "instructions_to_main_agent": "Update index.css with these HSL values for the dark theme. The app MUST be in dark mode by default. Ensure text contrast meets APCA/WCAG standards (e.g., text-slate-200 for body on dark slate)."
+  },
+  "visual_enhancers": {
+    "surfaces": "Use flat solid backgrounds with subtle 1px border (border-slate-700) and no soft shadows for cards. Apply the 'Grid Borders (The Technical Look)' for data-heavy sections if necessary. Avoid transparent backgrounds behind content.",
+    "hover_states": "Interactive elements must have explicit text and background color changes (e.g., hover:bg-amber-400 hover:text-black). Apply -translate-y-1 on card hovers.",
+    "loaders": "Use an industrial-feeling animated progress bar or a spinner in Amber for the 'Analyze' button state. It should feel mechanical and precise."
+  },
+  "components": {
+    "buttons": "Pill-shaped or slightly rounded (rounded-md) with sharp interaction animations. Primary CTAs use Amber background with black text.",
+    "file_upload": "A large drag-drop zone with a dashed border (border-dashed border-2 border-slate-600 bg-slate-800/30). Must include hover states (border-amber-500 bg-slate-800/50).",
+    "stage_hint_dropdown": "Use Shadcn 'Select' component. Ensure it follows the dark theme, no transparent backgrounds in the dropdown menu.",
+    "analysis_result_card": "A structured layout divided into 'Stage Badge', 'Progress Notes', 'Observations', and 'Issues'. Issues must be styled with warning aesthetics (amber/red borders or subtle warning backgrounds).",
+    "history_grid": "Grid of past analyses (grid-cols-1 md:grid-cols-2 xl:grid-cols-3) with tight gaps (gap-6). Each item shows a thumbnail image and a summary."
+  },
+  "spacing_and_layouts": {
+    "general": "Follow generous spacing for layout, but high density for data. Use p-6 or p-8 inside cards.",
+    "grid": "Use the high-density grid pattern for the history section. Align items start.",
+    "page": "Wrap the main content in a container with max-w-7xl. Provide a fixed sticky top header (backdrop-blur-xl bg-slate-900/80 border-b border-slate-800) with the app logo (BuildManager VIC)."
+  },
+  "motion": {
+    "transitions": "Use specific transitions for buttons and cards (e.g., transition-colors duration-200, transition-transform duration-200). DO NOT use 'transition: all'.",
+    "entrances": "Staggered fade-in (opacity-0 to opacity-100, translate-y-4 to translate-y-0) for history cards using framer-motion."
+  },
+  "accessibility": {
+    "focus_states": "High contrast focus rings (focus:ring-2 focus:ring-amber-500).",
+    "aria": "Add aria-hidden='true' to decorative icons.",
+    "testing": "All interactive elements MUST have a data-testid attribute (e.g., data-testid='upload-dropzone', data-testid='analyze-button')."
+  },
+  "media": {
+    "icons": "Use lucide-react. Prefer clear, technical icons suitable for construction.",
+    "image_urls": {
+      "history_thumbnails": [
+        {
+          "url": "https://images.unsplash.com/photo-1587582423116-ec07293f0395?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwZnJhbWluZ3xlbnwwfHx8fDE3ODM4MjA5NTB8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Worker on building frame - use as thumbnail for a 'Framing Stage' history item."
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1640101086894-7d70c3e70179?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTN8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwZm91bmRhdGlvbnxlbnwwfHx8fDE3ODM4MjA5NTB8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Workers pouring concrete - use as thumbnail for a 'Foundation Stage' history item."
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1609867271967-a82f85c48531?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHw0fHxjb25zdHJ1Y3Rpb24lMjBzaXRlJTIwZnJhbWluZ3xlbnwwfHx8fDE3ODM4MjA5NTB8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Construction site with crane - use as thumbnail for a 'Lockup Stage' history item."
+        }
+      ]
+    }
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": "Do not make generic centered layouts. Use flat, sharp or slightly rounded corners (max 8px). Do not apply 'transition: all'. Never use text-align: center on the main app container. Add data-testid to all interactive elements. Ensure dark mode is explicitly configured. Use lucide-react for icons. Do not use AI emojis. Prioritize Shadcn UI components for dropdowns (Select) and buttons. Ensure all headers have explicit text color and tracking.",
+  "instructions_to_main_agent": [
+    "Install and setup required Shadcn components: Button, Card, Select, Badge, ScrollArea.",
+    "Install lucide-react, framer-motion, clsx, tailwind-merge.",
+    "Configure Tailwind for dark mode by default.",
+    "Implement the layout with a sticky header, main photo upload area, and history grid below.",
+    "Create a mock 'Analyze' function that simulates a 2-second loading state before showing the Result Card.",
+    "The Result Card must display: Stage Badge, Progress Notes (list), Observations (list), Issues List (styled distinctly as warnings)."
+  ]
+}
