@@ -56,7 +56,7 @@ export default function AnalyzePage() {
       fd.append("file", file);
       if (stageHint !== "auto") fd.append("project_stage", stageHint);
       if (notes.trim()) fd.append("notes", notes.trim());
-      const { data } = await axios.post(`${API}/photos/analyze`, fd);
+      const { data } = await axios.post(`${API}/photos/analyze`, fd, { timeout: 120000 });
       setResult(data);
       fetchHistory();
       toast.success("AI analysis complete");

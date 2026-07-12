@@ -165,8 +165,8 @@ async def analyze_photo(
     if img_format not in ALLOWED_FORMATS:
         raise HTTPException(status_code=400, detail=f"Unsupported image format '{img_format}'. Please upload a JPEG, PNG or WEBP photo.")
 
-    if project_stage and project_stage not in VALID_STAGES:
-        raise HTTPException(status_code=400, detail=f"Invalid project_stage. Must be one of: {sorted(VALID_STAGES)}")
+    if project_stage and (project_stage == 'unknown' or project_stage not in VALID_STAGES):
+        raise HTTPException(status_code=400, detail=f"Invalid project_stage. Must be one of: {sorted(VALID_STAGES - {'unknown'})}")
 
     # Downscale a copy for the LLM to keep payload lean
     llm_img = img.convert('RGB')
