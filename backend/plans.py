@@ -4,6 +4,7 @@ and one-click apply into tasks + estimate lines.
 Collections: plan_analyses (uploaded drawing + extracted scope),
              plan_drafts (AI-generated build plan awaiting user review/apply).
 """
+import asyncio
 import io
 import json
 import uuid
@@ -23,6 +24,82 @@ from trades import TRADE_TYPES
 from ai import vision_chat, extract_json, image_content, text_content, coerce_float, coerce_int
 
 logger = logging.getLogger(__name__)
+
+# ---------- Async job runner ----------
+
+_running_jobs = set()  # track active analysis job tasks
+
+
+async def _update_job(plan_id: str, **kwargs):
+    """Atomically update job_status, job_step, job_error, etc."""
+    await db.plan_analyses.update_one(
+        {"id": plan_id},
+        {"$set": {**kwargs, "updated_at": now_iso()}},
+    )
+
+
+async def _run_analysis(plan_id: str):
+    """Background task: render pages → AI per page → aggregate scope → done."""
+    # Concurrency guard: max 1 job at a time
+    _running_jobs.add(plan_id)
+    try:
+        await _update_job(plan_id, job_status="processing", job_step="Rendering drawing sheets…")
+        plan = await db.plan_analyses.find_one({"id": plan_id}, {"_id": 0})
+        if not plan:
+            await _update_job(plan_id, job_status="failed", job_error="Plan document not found.")
+            return
+
+        file_path = Path(plan["file_path"])
+        raw = file_path.read_bytes()
+        pages = render_pages(raw, plan["media_type"])
+
+        # Step 1: per-sheet extraction
+        page_summaries = []
+        for i, page_b64 in enumerate(pages, start=1):
+            await _update_job(plan_id, job_status="processing",
+                              job_step=f"Reading sheet {i} of {len(pages)}…")
+            try:
+                raw_reply = await vision_chat([
+                    {"role": "system", "content": PAGE_SYSTEM},
+                    {"role": "user", "content": [image_content(page_b64), text_content(page_prompt(i, len(pages)))]},
+                ], max_tokens=1024)
+                try:
+                    page_summaries.append(extract_json(raw_reply))
+                except ValueError:
+                    page_summaries.append({"drawing_type": "other", "summary": raw_reply[:400],
+                                           "rooms": [], "key_dimensions": [], "construction_notes": []})
+            except RuntimeError as e:
+                await _update_job(plan_id, job_status="failed",
+                                  job_error=f"AI analysis of sheet {i} failed: {str(e)[:200]}")
+                return
+
+        # Step 2: aggregate into a scope
+        await _update_job(plan_id, job_status="processing", job_step="Aggregating the project scope…")
+        try:
+            agg_reply = await vision_chat([
+                {"role": "system", "content": PAGE_SYSTEM},
+                {"role": "user", "content": AGGREGATE_PROMPT.format(pages_json=json.dumps(page_summaries, indent=1))},
+            ], max_tokens=1200)
+            scope = clean_scope(extract_json(agg_reply))
+        except RuntimeError as e:
+            await _update_job(plan_id, job_status="failed",
+                              job_error=f"Scope aggregation failed: {str(e)[:200]}")
+            return
+        except ValueError as e:
+            logger.error(f"Failed to parse AI scope response: {e}")
+            await _update_job(plan_id, job_status="failed",
+                              job_error="AI returned an unreadable response. Please try again.")
+            return
+
+        await _update_job(plan_id, job_status="analyzed", job_step="Complete.",
+                          page_summaries=page_summaries, scope=scope)
+
+    except Exception as e:
+        logger.error(f"Background analysis failed for {plan_id}: {e}")
+        await _update_job(plan_id, job_status="failed",
+                          job_error=f"Unexpected error: {str(e)[:200]}")
+    finally:
+        _running_jobs.discard(plan_id)
 
 plans_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
@@ -238,55 +315,64 @@ async def analyze_plan(project_id: str, file: UploadFile = File(...)):
     if len(raw) > MAX_PLAN_BYTES:
         raise HTTPException(status_code=413, detail="Drawing too large. Maximum upload size is 30 MB.")
 
-    pages = render_pages(raw, file.content_type)
-
-    # Step 1: per-sheet extraction
-    page_summaries = []
-    try:
-        for i, page_b64 in enumerate(pages, start=1):
-            raw_reply = await vision_chat([
-                {"role": "system", "content": PAGE_SYSTEM},
-                {"role": "user", "content": [image_content(page_b64), text_content(page_prompt(i, len(pages)))]},
-            ], max_tokens=1024)
-            try:
-                page_summaries.append(extract_json(raw_reply))
-            except ValueError:
-                page_summaries.append({"drawing_type": "other", "summary": raw_reply[:400],
-                                       "rooms": [], "key_dimensions": [], "construction_notes": []})
-
-        # Step 2: aggregate into a scope
-        agg_reply = await vision_chat([
-            {"role": "system", "content": PAGE_SYSTEM},
-            {"role": "user", "content": AGGREGATE_PROMPT.format(pages_json=json.dumps(page_summaries, indent=1))},
-        ], max_tokens=1200)
-        scope = clean_scope(extract_json(agg_reply))
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=f"AI analysis failed: {str(e)[:200]}")
-    except ValueError as e:
-        logger.error(f"Failed to parse AI scope response: {e}")
-        raise HTTPException(status_code=502, detail="AI returned an unreadable response. Please try again.")
-
     plan_id = str(uuid.uuid4())
     ext = PLAN_TYPES[file.content_type]
     file_path = PLANS_DIR / f"{plan_id}{ext}"
     file_path.write_bytes(raw)
+
+    # Count pages for progress tracking (fast, no AI yet)
+    try:
+        page_count = len(render_pages(raw, file.content_type))
+    except HTTPException:
+        raise
+    except Exception:
+        page_count = 1
 
     record = {
         "id": plan_id,
         "project_id": project_id,
         "filename": file.filename or f"drawing{ext}",
         "media_type": file.content_type,
-        "page_count": len(pages),
-        "page_summaries": page_summaries,
-        "scope": scope,
-        "status": "analyzed",
+        "page_count": page_count,
+        "page_summaries": [],
+        "scope": None,
+        "status": "pending",
+        "job_status": "pending",
+        "job_step": "Queued for analysis…",
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
     doc = dict(record)
     doc["file_path"] = str(file_path)
     await db.plan_analyses.insert_one(doc)
-    return record
+
+    # Dispatch background analysis task
+    asyncio.create_task(_run_analysis(plan_id))
+
+    return {"id": plan_id, "job_status": "pending", "page_count": page_count}
+
+
+@plans_router.get("/plans/{plan_id}")
+async def get_plan_status(plan_id: str):
+    """Polling endpoint: returns job status + progress info."""
+    plan = await db.plan_analyses.find_one({"id": plan_id}, {"_id": 0, "file_path": 0})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan analysis not found.")
+    return plan
+
+
+@plans_router.put("/plans/{plan_id}/scope")
+async def update_scope(plan_id: str, data: dict):
+    """Save user-edited scope back to the plan."""
+    plan = await db.plan_analyses.find_one({"id": plan_id}, {"_id": 0, "project_id": 1})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan analysis not found.")
+    cleaned = clean_scope(data)
+    await db.plan_analyses.update_one(
+        {"id": plan_id},
+        {"$set": {"scope": cleaned, "updated_at": now_iso()}},
+    )
+    return cleaned
 
 
 @plans_router.get("/projects/{project_id}/plans")

@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   FileUp, X, Loader2, Sparkles, DraftingCompass, Home, Layers, BedDouble, Bath, Car, Ruler,
-  Wrench, ListChecks, RefreshCw, CheckCircle2, ArrowRight,
+  Wrench, ListChecks, RefreshCw, CheckCircle2, ArrowRight, AlertCircle, Pencil, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -20,13 +21,6 @@ import { tradeTypeLabel } from "@/lib/tradeUtils";
 const MAX_BYTES = 30 * 1024 * 1024;
 const ACCEPTED = ["application/pdf", "image/jpeg", "image/png"];
 
-const ANALYZE_STEPS = [
-  "Uploading drawing…",
-  "Rendering drawing sheets…",
-  "AI is reading each sheet — rooms, dimensions, materials…",
-  "Cross-checking sheets against each other…",
-  "Aggregating the project scope…",
-];
 const DRAFT_STEPS = [
   "Feeding the scope and your rate guide to the AI…",
   "Drafting stage-by-stage tasks…",
@@ -103,17 +97,128 @@ const PlanUploadZone = ({ file, onFileSelected, onClear, disabled }) => {
   );
 };
 
-const ScopeFact = ({ icon: Icon, label, value }) => (
-  <div className="rounded-md border border-slate-700/70 bg-slate-800/40 px-3 py-2">
-    <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-0.5">
-      <Icon className="h-3 w-3 text-amber-400" aria-hidden="true" /> {label}
-    </p>
-    <p className="text-sm text-slate-200">{value ?? "—"}</p>
-  </div>
-);
+const EditableField = ({ label, value, onChange, type, placeholder }) => {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div className="rounded-md border border-slate-700/70 bg-slate-800/40 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-0.5 flex items-center justify-between">
+        <span>{label}</span>
+        <button type="button" onClick={() => setEditing(!editing)}
+          className="text-slate-500 hover:text-amber-400 transition-colors" title="Edit">
+          {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+        </button>
+      </p>
+      {editing ? (
+        <Input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder} autoFocus
+          className="w-full h-7 text-sm bg-slate-900/50 border-slate-600 mt-1" />
+      ) : (
+        <p className="text-sm text-slate-200">{value ?? "—"}</p>
+      )}
+    </div>
+  );
+};
 
-const ScopeCard = ({ plan }) => {
-  const s = plan.scope || {};
+const EditableList = ({ label, items, onChange, colorClass }) => {
+  const [editing, setEditing] = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const add = () => { const v = newItem.trim(); if (v) { onChange([...(items || []), v]); setNewItem(""); } };
+  const remove = (i) => { onChange((items || []).filter((_, idx) => idx !== i)); };
+  return (
+    <div>
+      <p className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold">{label}</span>
+        <button type="button" onClick={() => setEditing(!editing)}
+          className="text-slate-500 hover:text-amber-400 transition-colors" title="Edit">
+          {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+        </button>
+      </p>
+      <ul className="space-y-1 mt-1">
+        {(items || []).map((f, i) => (
+          <li key={i} className="text-sm text-slate-300 flex items-center gap-2">
+            <span className={`${colorClass} shrink-0 mt-0.5`}>▸</span>
+            <span className="flex-1">{f}</span>
+            {editing && (
+              <button type="button" onClick={() => remove(i)} className="text-slate-500 hover:text-red-400 shrink-0">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {editing && (
+        <div className="flex gap-2 mt-2">
+          <Input value={newItem} onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && add()} placeholder="Add item…"
+            className="h-7 text-sm bg-slate-900/50 border-slate-600" />
+          <Button size="sm" onClick={add} className="h-7 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3">
+            Add
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EditableSummary = ({ value, onChange }) => {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold">Summary</span>
+        <button type="button" onClick={() => setEditing(!editing)}
+          className="text-slate-500 hover:text-amber-400 transition-colors" title="Edit">
+          {editing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+        </button>
+      </div>
+      {editing ? (
+        <Textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)}
+          autoFocus rows={4}
+          className="w-full text-sm bg-slate-900/50 border-slate-600 resize-none" />
+      ) : (
+        <p className="text-sm text-slate-300 leading-relaxed">{value || "—"}</p>
+      )}
+    </div>
+  );
+};
+
+const ScopeCard = ({ plan, onSaved }) => {
+  const [scope, setScope] = useState(plan.scope || {});
+  const [saving, setSaving] = useState(false);
+
+  // Reset when plan changes
+  useEffect(() => { setScope(plan.scope || {}); }, [plan.scope]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      // Convert numeric fields back
+      const payload = {
+        dwelling_type: scope.dwelling_type || null,
+        storeys: scope.storeys ? Number(scope.storeys) : null,
+        bedrooms: scope.bedrooms ? Number(scope.bedrooms) : null,
+        bathrooms: scope.bathrooms ? Number(scope.bathrooms) : null,
+        garage_spaces: scope.garage_spaces ? Number(scope.garage_spaces) : null,
+        approx_floor_area_m2: scope.approx_floor_area_m2 ? Number(scope.approx_floor_area_m2) : null,
+        construction_type: scope.construction_type || null,
+        roof_type: scope.roof_type || null,
+        notable_features: scope.notable_features || [],
+        site_considerations: scope.site_considerations || [],
+        summary: scope.summary || "",
+      };
+      await api.put(`/plans/${plan.id}/scope`, payload);
+      toast.success("Scope updated successfully.");
+      if (onSaved) onSaved();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to save scope.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const set = (k, v) => setScope((s) => ({ ...s, [k]: v }));
+  const setList = (k, v) => setScope((s) => ({ ...s, [k]: v }));
+
   return (
     <section className="rounded-md border border-slate-700 bg-card p-5 mb-6" data-testid="plan-scope-card">
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -122,37 +227,27 @@ const ScopeCard = ({ plan }) => {
         <span className="text-xs text-slate-500">{plan.filename} · {plan.page_count} sheet{plan.page_count === 1 ? "" : "s"} · {formatDateTime(plan.created_at)}</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <ScopeFact icon={Home} label="Dwelling" value={s.dwelling_type} />
-        <ScopeFact icon={Layers} label="Storeys" value={s.storeys} />
-        <ScopeFact icon={BedDouble} label="Bedrooms" value={s.bedrooms} />
-        <ScopeFact icon={Bath} label="Bathrooms" value={s.bathrooms} />
-        <ScopeFact icon={Car} label="Garage" value={s.garage_spaces} />
-        <ScopeFact icon={Ruler} label="Floor area" value={s.approx_floor_area_m2 ? `≈ ${s.approx_floor_area_m2} m²` : null} />
-        <ScopeFact icon={Wrench} label="Construction" value={s.construction_type} />
-        <ScopeFact icon={Home} label="Roof" value={s.roof_type} />
+        <EditableField label="Dwelling" value={scope.dwelling_type} onChange={(v) => set("dwelling_type", v)} placeholder="e.g. single dwelling" />
+        <EditableField label="Storeys" value={scope.storeys ?? ""} type="number" onChange={(v) => set("storeys", v)} placeholder="1" />
+        <EditableField label="Bedrooms" value={scope.bedrooms ?? ""} type="number" onChange={(v) => set("bedrooms", v)} placeholder="3" />
+        <EditableField label="Bathrooms" value={scope.bathrooms ?? ""} type="number" onChange={(v) => set("bathrooms", v)} placeholder="2" />
+        <EditableField label="Garage" value={scope.garage_spaces ?? ""} type="number" onChange={(v) => set("garage_spaces", v)} placeholder="2" />
+        <EditableField label="Floor area (m²)" value={scope.approx_floor_area_m2 ?? ""} type="number" onChange={(v) => set("approx_floor_area_m2", v)} placeholder="150" />
+        <EditableField label="Construction" value={scope.construction_type} onChange={(v) => set("construction_type", v)} placeholder="slab + timber frame" />
+        <EditableField label="Roof" value={scope.roof_type} onChange={(v) => set("roof_type", v)} placeholder="Colorbond metal" />
       </div>
-      {s.summary && <p className="text-sm text-slate-300 leading-relaxed mb-3" data-testid="plan-scope-summary">{s.summary}</p>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {s.notable_features?.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold mb-1">Notable features</p>
-            <ul className="space-y-1">
-              {s.notable_features.map((f, i) => (
-                <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-amber-500 shrink-0 mt-0.5">▸</span>{f}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {s.site_considerations?.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold mb-1">Site considerations</p>
-            <ul className="space-y-1">
-              {s.site_considerations.map((f, i) => (
-                <li key={i} className="text-sm text-slate-300 flex gap-2"><span className="text-sky-400 shrink-0 mt-0.5">▸</span>{f}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      <div className="mb-4">
+        <EditableSummary value={scope.summary} onChange={(v) => set("summary", v)} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <EditableList label="Notable features" items={scope.notable_features} onChange={(v) => setList("notable_features", v)} colorClass="text-amber-500" />
+        <EditableList label="Site considerations" items={scope.site_considerations} onChange={(v) => setList("site_considerations", v)} colorClass="text-sky-400" />
+      </div>
+      <div className="flex justify-end">
+        <Button data-testid="scope-save-button" onClick={save} disabled={saving}
+          className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200 text-xs px-4 py-1.5">
+          {saving ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Saving…</>) : (<><Check className="h-3.5 w-3.5" aria-hidden="true" /> Save Changes</>)}
+        </Button>
       </div>
     </section>
   );
@@ -363,33 +458,75 @@ export const PlannerTab = ({ project, onChanged }) => {
   const [file, setFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [drafting, setDrafting] = useState(false);
-  const analyzeMsg = useStagedProgress(analyzing, ANALYZE_STEPS);
+  const [jobStatus, setJobStatus] = useState(null);      // {id, status, step, error}
   const draftMsg = useStagedProgress(drafting, DRAFT_STEPS);
+  const pollRef = useRef(null);
 
   const fetchPlans = useCallback(async () => {
     const { data } = await api.get(`/projects/${project.id}/plans`);
     setPlans(data);
+    // If a plan is still processing, start polling it
+    const firstPlan = data[0];
+    if (firstPlan && firstPlan.job_status && ["pending", "processing"].includes(firstPlan.job_status)) {
+      setAnalyzing(true);
+      setJobStatus({ id: firstPlan.id, status: firstPlan.job_status, step: firstPlan.job_step, error: firstPlan.job_error });
+      startPolling(firstPlan.id);
+    }
   }, [project.id]);
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
+  // Stop polling on unmount
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  const startPolling = (planId) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/plans/${planId}`);
+        setJobStatus({ id: data.id, status: data.job_status, step: data.job_step, error: data.job_error });
+        if (data.job_status === "analyzed") {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setAnalyzing(false);
+          toast.success("Drawings analysed — scope extracted below.");
+          fetchPlans();
+        } else if (data.job_status === "failed") {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setAnalyzing(false);
+          setFile(null);
+          toast.error(data.job_error || "AI analysis failed — please try again.", { duration: 10000 });
+        }
+      } catch (e) {
+        // keep polling on transient errors
+      }
+    };
+    poll(); // immediate first check
+    pollRef.current = setInterval(poll, 30000); // poll every 30s
+  };
+
   const analyze = async () => {
     if (!file) return;
     setAnalyzing(true);
+    setJobStatus({ id: null, status: "pending", step: "Uploading drawing…", error: null });
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await api.post(`/projects/${project.id}/plans/analyze`, fd, { timeout: 600000 });
-      setFile(null);
-      toast.success("Drawings analysed — scope extracted below.");
-      fetchPlans();
+      const { data } = await api.post(`/projects/${project.id}/plans/analyze`, fd, { timeout: 60000 });
+      // Immediate response: {id, job_status: "pending", page_count}
+      setJobStatus({ id: data.id, status: "pending", step: "Queued for analysis…", error: null });
+      toast.info("Drawing uploaded — AI analysis started in the background.");
+      startPolling(data.id);
     } catch (e) {
+      setAnalyzing(false);
+      setJobStatus(null);
       toast.error(
-        (formatApiErrorDetail(e.response?.data?.detail) || "AI analysis failed — check the vision model is running, then try again."),
+        (formatApiErrorDetail(e.response?.data?.detail) || "Failed to upload drawing — please try again."),
         { duration: 10000 },
       );
-    } finally {
-      setAnalyzing(false);
     }
   };
 
@@ -432,10 +569,17 @@ export const PlannerTab = ({ project, onChanged }) => {
             className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
             {analyzing ? (<><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Analysing…</>) : (<><Sparkles className="h-4 w-4" aria-hidden="true" /> Analyse Drawings</>)}
           </Button>
-          {analyzing && (
-            <p className="text-xs text-slate-400" data-testid="plan-analyze-progress">
-              {analyzeMsg} <span className="text-slate-600">— large drawing sets can take 1–3 minutes.</span>
-            </p>
+          {analyzing && jobStatus && (
+            <div className="flex flex-col gap-2 min-w-[260px]" data-testid="plan-analyze-progress">
+              <div className="flex items-center gap-2">
+                {jobStatus.status === "pending" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" aria-hidden="true" />}
+                {jobStatus.status === "processing" && <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" aria-hidden="true" />}
+                <p className="text-xs text-slate-300">{jobStatus.step}</p>
+              </div>
+              {(jobStatus.status === "pending" || jobStatus.status === "processing") && (
+                <p className="text-[10px] text-slate-500">Polling every 30 s — results appear automatically when ready.</p>
+              )}
+            </div>
           )}
         </div>
       </section>
