@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut, Hammer, BookOpen } from "lucide-react";
+import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut, Hammer, BookOpen, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GlobalSearch } from "@/components/GlobalSearch";
 
@@ -9,6 +9,7 @@ const NAV = [
   { to: "/trades", label: "Trades", icon: Hammer, end: false, testId: "nav-trades" },
   { to: "/rates", label: "Rate Guide", icon: BookOpen, end: false, testId: "nav-rates" },
   { to: "/analyzer", label: "Photo Analyzer", icon: ScanSearch, end: false, testId: "nav-analyzer" },
+  { to: "/settings", label: "Settings", icon: Settings, end: false, testId: "nav-settings" },
 ];
 
 const linkClass = ({ isActive }) =>

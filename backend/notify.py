@@ -49,6 +49,9 @@ def now_iso() -> str:
 class SendResult(BaseModel):
     ok: bool
     provider_message_id: Optional[str] = None
+    # Gmail returns a thread id; recording it is what lets a reply be matched
+    # back to the exact invitation later.
+    thread_id: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -178,7 +181,15 @@ async def _email_http(to: str, subject: str, html: str, text: str) -> SendResult
     return SendResult(ok=True, provider_message_id=str(body.get("id") or body.get("message_id") or "") or None)
 
 
-EMAIL_DRIVERS = {"console": _email_console, "smtp": _email_smtp, "http": _email_http}
+async def _email_gmail(to: str, subject: str, html: str, text: str) -> SendResult:
+    """Send from the builder's own connected mailbox via the Gmail API."""
+    import gmail  # imported lazily: notify must stay usable without the integration
+    sent = await gmail.send_message(to, subject, html, text)
+    return SendResult(ok=True, provider_message_id=sent["message_id"], thread_id=sent["thread_id"])
+
+
+EMAIL_DRIVERS = {"console": _email_console, "smtp": _email_smtp,
+                 "http": _email_http, "gmail": _email_gmail}
 
 
 # ---------- sms drivers ----------

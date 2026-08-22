@@ -119,6 +119,8 @@ def new_invitation(trade_id: str) -> dict:
         "token": secrets.token_urlsafe(24),
         "status": "pending",
         "sent_at": None,
+        "gmail_thread_id": None,
+        "gmail_message_id": None,
         "first_viewed_at": None,
         "downloaded_at": None,
         "submitted_at": None,
@@ -295,6 +297,7 @@ async def send_rfq(rfq_id: str, data: SendInput):
         rendered = notify.render_rfq(context)
 
         sent_channels, errors = [], []
+        email_result = None
         for channel in channels:
             to = trade.get("email", "") if channel == "email" else trade.get("phone", "")
             body = rendered["text"] if channel == "email" else rendered["sms"]
@@ -305,6 +308,7 @@ async def send_rfq(rfq_id: str, data: SendInput):
             )
             if channel == "email":
                 result = await notify.send_email(to, rendered["subject"], rendered["html"], rendered["text"])
+                email_result = result
             else:
                 result = await notify.send_sms(to, rendered["sms"])
             await notify.settle_notification(note_id, result)
@@ -314,16 +318,18 @@ async def send_rfq(rfq_id: str, data: SendInput):
                 errors.append(f"{channel}: {result.error}")
 
         ok = bool(sent_channels)
-        await db.rfqs.update_one(
-            {"id": rfq_id, "invitations.id": inv["id"]},
-            {"$set": {
-                "invitations.$.status": "sent" if ok else "failed",
-                "invitations.$.sent_at": now_iso() if ok else inv.get("sent_at"),
-                "invitations.$.channels": sent_channels,
-                "invitations.$.last_error": None if ok else "; ".join(errors),
-                "updated_at": now_iso(),
-            }},
-        )
+        updates = {
+            "invitations.$.status": "sent" if ok else "failed",
+            "invitations.$.sent_at": now_iso() if ok else inv.get("sent_at"),
+            "invitations.$.channels": sent_channels,
+            "invitations.$.last_error": None if ok else "; ".join(errors),
+            "updated_at": now_iso(),
+        }
+        # Keep the Gmail thread so a reply can be matched back to this trade.
+        if email_result and email_result.thread_id:
+            updates["invitations.$.gmail_thread_id"] = email_result.thread_id
+            updates["invitations.$.gmail_message_id"] = email_result.provider_message_id
+        await db.rfqs.update_one({"id": rfq_id, "invitations.id": inv["id"]}, {"$set": updates})
         results.append({
             "invitation_id": inv["id"],
             "trade_id": inv["trade_id"],

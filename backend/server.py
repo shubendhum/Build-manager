@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
+import asyncio
 import io
 import json
 import base64
@@ -27,6 +28,7 @@ from quotes import quotes_router  # noqa: E402
 from packages import packages_router  # noqa: E402
 from nextsteps import nextsteps_router  # noqa: E402
 from board import board_router  # noqa: E402
+from integrations import integrations_router, public_integrations_router, poll_loop  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
 from variations import variations_router  # noqa: E402
 from diary import diary_router  # noqa: E402
@@ -276,6 +278,8 @@ app.include_router(quotes_router)
 app.include_router(packages_router)
 app.include_router(nextsteps_router)
 app.include_router(board_router)
+app.include_router(integrations_router)
+app.include_router(public_integrations_router)
 app.include_router(rfqs_router)
 app.include_router(public_rfqs_router)
 app.include_router(variations_router)
@@ -305,6 +309,8 @@ async def on_startup():
     await db.notifications.create_index([("rfq_id", 1), ("created_at", -1)])
     await ensure_reference_rates()
     await seed_all()
+    # Background: pull trade replies out of Gmail without anyone clicking.
+    asyncio.create_task(poll_loop())
 
 
 app.add_middleware(
