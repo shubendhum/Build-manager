@@ -482,8 +482,19 @@ async def seed_documents():
         })
 
 
+def demo_seed_enabled() -> bool:
+    """Demo/test data is opt-in. Set SEED_DEMO_DATA=true to restore the
+    "Residence – Ballarat West" sample project and its trades/quotes/invoices/
+    estimates/photos/documents. Off by default so a cleared database stays clear
+    across restarts. The admin account and the VIC reference rates are NOT demo
+    data and are always seeded."""
+    return os.environ.get("SEED_DEMO_DATA", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def seed_all():
     await seed_user()
+    if not demo_seed_enabled():
+        return
     await seed_demo_project()
     await seed_trades_and_finance()
     await seed_estimates_and_dashboard()
