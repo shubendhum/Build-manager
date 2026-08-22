@@ -4,8 +4,11 @@ One RFQ carries many invitations, each with its own token. Public endpoints are
 exercised WITHOUT auth. Self-fixturing — creates its own project/trades and
 deletes them at teardown, so it does NOT depend on the demo seed data.
 
-Sends run against the `console` notify driver (the default), so nothing leaves
-the machine.
+Every fixture address is @example.com — RFC 2606 reserved — and notify refuses
+to send there whatever driver is configured. These tests therefore exercise the
+whole send path (log rows, invitation status, partial-failure handling) without
+any possibility of real mail leaving the machine, even when the live Gmail
+driver is active.
 """
 import os
 import io
@@ -220,37 +223,40 @@ class TestDocuments:
 
 
 class TestSend:
-    def test_send_logs_and_marks_sent(self, session, project_id, package_id, trades):
+    """The fixtures use reserved addresses, so a send is refused at the driver.
+    That is deliberate: it proves the guard AND the surrounding plumbing without
+    ever putting a message on the wire."""
+
+    def test_reserved_addresses_are_refused(self, session, project_id, package_id, trades):
         rfq = make_rfq(session, project_id, package_id, trades[:2])
         r = session.post(f"{API}/rfqs/{rfq['id']}/send", json={"channels": ["email"]}, timeout=T)
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["sent"] == 2 and body["failed"] == 0
-        assert all(x["ok"] for x in body["results"])
+        assert body["sent"] == 0, "nothing may be delivered to a reserved test domain"
+        assert body["failed"] == 2
+        assert all("reserved test address" in x["error"] for x in body["results"])
+
+    def test_refusal_is_still_logged_and_stamped(self, session, project_id, package_id, trades):
+        """A refused send must leave the same audit trail as a failed one."""
+        rfq = make_rfq(session, project_id, package_id, trades[:2])
+        session.post(f"{API}/rfqs/{rfq['id']}/send", json={"channels": ["email"]}, timeout=T)
 
         log = session.get(f"{API}/rfqs/{rfq['id']}/log", timeout=T).json()
         assert len(log) == 2, "one notification row per channel per invitation"
-        assert all(n["status"] == "sent" and n["channel"] == "email" for n in log)
-        assert all(n["subject"] and n["body"] for n in log), "log stores what was actually sent"
+        assert all(n["status"] == "failed" for n in log)
+        assert all(n["subject"] and n["body"] for n in log), "log stores what would have been sent"
 
         fresh = next(x for x in session.get(f"{API}/projects/{project_id}/rfqs", timeout=T).json()
                      if x["id"] == rfq["id"])
-        assert all(i["status"] == "sent" and i["sent_at"] for i in fresh["invitations"])
+        assert all(i["status"] == "failed" and i["last_error"] for i in fresh["invitations"])
 
-    def test_partial_failure_does_not_block_the_rest(self, session, project_id, package_id, trades):
-        """The trade with no email must fail alone."""
+    def test_missing_address_reported_separately(self, session, project_id, package_id, trades):
+        """The trade with no email at all fails for its own reason."""
         rfq = make_rfq(session, project_id, package_id, [trades[0], trades[3]])
         body = session.post(f"{API}/rfqs/{rfq['id']}/send", json={"channels": ["email"]}, timeout=T).json()
-        assert body["sent"] == 1 and body["failed"] == 1
-        failed = next(x for x in body["results"] if not x["ok"])
-        assert "no email address" in failed["error"].lower()
-
-        fresh = next(x for x in session.get(f"{API}/projects/{project_id}/rfqs", timeout=T).json()
-                     if x["id"] == rfq["id"])
-        by_trade = {i["trade_id"]: i for i in fresh["invitations"]}
-        assert by_trade[trades[0]]["status"] == "sent"
-        assert by_trade[trades[3]]["status"] == "failed"
-        assert by_trade[trades[3]]["last_error"]
+        by_trade = {x["trade_id"]: x for x in body["results"]}
+        assert "no email address" in by_trade[trades[3]]["error"].lower()
+        assert "reserved test address" in by_trade[trades[0]]["error"].lower()
 
     def test_resend_one_invitation_appends_to_log(self, session, project_id, package_id, trades):
         rfq = make_rfq(session, project_id, package_id, trades[:1])

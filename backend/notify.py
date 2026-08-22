@@ -99,6 +99,21 @@ def _allowlist() -> list:
     return [p.strip().lower() for p in raw.split(",") if p.strip()] if raw else []
 
 
+# RFC 2606 / RFC 6761 reserve these precisely so they can appear in tests and
+# documentation and never reach a real mailbox. Sending to one is always a
+# mistake — a real send costs nothing but noise in the Sent folder and a bounce.
+RESERVED_DOMAINS = {"example.com", "example.net", "example.org", "example.edu", "localhost"}
+RESERVED_TLDS = (".test", ".example", ".invalid", ".localhost", ".local")
+
+
+def is_undeliverable(to: str) -> bool:
+    addr = (to or "").strip().lower()
+    if "@" not in addr:
+        return True
+    domain = addr.rsplit("@", 1)[1].strip("]>. ")
+    return domain in RESERVED_DOMAINS or domain.endswith(RESERVED_TLDS)
+
+
 def allowed_recipient(to: str) -> bool:
     patterns = _allowlist()
     if not patterns:
@@ -235,6 +250,10 @@ async def send_email(to: str, subject: str, html: str, text: str) -> SendResult:
     """Never raises — transport problems come back as SendResult(ok=False)."""
     if not to:
         return SendResult(ok=False, error="No email address on file for this trade.")
+    if is_undeliverable(to):
+        return SendResult(ok=False, error=(
+            f"{to} is a reserved test address (RFC 2606) — refusing to send. "
+            "Nothing was delivered."))
     if not allowed_recipient(to):
         return SendResult(ok=False, error=f"{to} is not on NOTIFY_ALLOWLIST — skipped.")
     driver = EMAIL_DRIVERS.get(email_driver())
@@ -251,6 +270,8 @@ async def send_sms(to: str, body: str) -> SendResult:
     """Never raises — transport problems come back as SendResult(ok=False)."""
     if not to:
         return SendResult(ok=False, error="No mobile number on file for this trade.")
+    if "@" in to:
+        return SendResult(ok=False, error=f"{to} is not a mobile number.")
     if not allowed_recipient(to):
         return SendResult(ok=False, error=f"{to} is not on NOTIFY_ALLOWLIST — skipped.")
     driver = SMS_DRIVERS.get(sms_driver())
