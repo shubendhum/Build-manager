@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MapPin, ChevronDown, Hammer, FileSearch, CalendarDays, Wallet, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, MapPin, Hammer, FileSearch, CalendarDays, Wallet, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { NextSteps } from "@/components/NextSteps";
 import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
@@ -22,29 +19,33 @@ import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
-// The builder's loop — engage, price, book, invoice, pay, cost — is one row per
-// trade on the Work board. Everything else is reference material and sits behind
-// More, so the main bar stays at four choices.
-const MAIN = [
-  ["work", "Work", Hammer],          // who is doing what, and where it is up to
-  ["planner", "Plan", FileSearch],   // read the drawings
-  ["roadmap", "Schedule", CalendarDays],
-  ["budget", "Costs", Wallet],
+// Five plain areas, all visible — no dropdown to hunt through. Anything with
+// more than one screen shows them as a small sub-nav underneath, so every
+// destination is on the page rather than hidden behind "More".
+//
+// The four items that used to sit in that dropdown — quotes, packages,
+// invoices, trades — were duplicates of what the Work board already shows per
+// row. They are kept (they carry detail the board does not, like progress
+// claims and manual quote entry) but filed under the area they belong to.
+const AREAS = [
+  { key: "work", label: "Work", icon: Hammer, children: [
+      ["work", "Board"], ["packages", "Packages"], ["quotes", "Quotes"], ["trades", "Tradies"],
+  ] },
+  { key: "plan", label: "Plan", icon: FileSearch, children: [["planner", "From drawings"]] },
+  { key: "schedule", label: "Schedule", icon: CalendarDays, children: [
+      ["roadmap", "Tasks"], ["diary", "Site diary"],
+  ] },
+  { key: "money", label: "Money", icon: Wallet, children: [
+      ["budget", "Budget"], ["invoices", "Invoices & claims"], ["variations", "Variations"],
+  ] },
+  { key: "files", label: "Files", icon: FolderOpen, children: [
+      ["documents", "Documents"], ["overview", "Job details"],
+  ] },
 ];
 
-const MORE = [
-  ["overview", "Project details"],
-  ["quotes", "All quotes"],
-  ["invoices", "All invoices"],
-  ["packages", "Package list"],
-  ["trades", "Trades on this job"],
-  ["variations", "Variations"],
-  ["diary", "Site diary"],
-  ["documents", "Documents"],
-];
-
-const LEAVES = [...MAIN, ...MORE].map(([k]) => k);
-const MORE_KEYS = MORE.map(([k]) => k);
+const LEAF_TO_AREA = {};
+AREAS.forEach((a) => a.children.forEach(([leaf]) => { LEAF_TO_AREA[leaf] = a.key; }));
+const LEAVES = Object.keys(LEAF_TO_AREA);
 
 // Actions the Work board already surfaces on its own rows — don't say it twice.
 const BOARD_COVERS = new Set([
@@ -124,8 +125,9 @@ export default function ProjectDetailPage() {
     documents: <DocumentsTab projectId={project.id} />,
   }[leaf];
 
-  const moreActive = MORE_KEYS.includes(leaf);
-  const moreLabel = MORE.find(([k]) => k === leaf)?.[1];
+  const area = LEAF_TO_AREA[leaf];
+  const activeArea = AREAS.find((a) => a.key === area);
+  const goArea = (a) => setLeaf(a.children[0][0]);
   const tabCls = (on) =>
     `px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
       on ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:text-amber-400 hover:bg-slate-800"
@@ -163,31 +165,32 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <nav className="flex flex-wrap items-center gap-1 mb-6 border-b border-slate-800 pb-3" aria-label="Project sections">
-        {MAIN.map(([k, label, Icon]) => (
-          <button key={k} type="button" data-testid={`tab-${k}`} onClick={() => setLeaf(k)}
-            aria-current={leaf === k ? "page" : undefined}
-            className={`${tabCls(leaf === k)} inline-flex items-center gap-2`}>
-            <Icon className="h-4 w-4" aria-hidden="true" /> {label}
+      <nav className="flex flex-wrap items-center gap-1 mb-3" aria-label="Job sections">
+        {AREAS.map((a) => (
+          <button key={a.key} type="button" data-testid={`tab-${a.key}`} onClick={() => goArea(a)}
+            aria-current={area === a.key ? "page" : undefined}
+            className={`${tabCls(area === a.key)} inline-flex items-center gap-2`}>
+            <a.icon className="h-4 w-4" aria-hidden="true" /> {a.label}
           </button>
         ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" data-testid="tab-more" className={`${tabCls(moreActive)} inline-flex items-center gap-1`}>
-              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-              {moreActive ? moreLabel : "More"} <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-card border-slate-700">
-            {MORE.map(([k, label]) => (
-              <DropdownMenuItem key={k} data-testid={`more-${k}`} onSelect={() => setLeaf(k)}
-                className="text-slate-300 focus:bg-slate-800 focus:text-amber-400 cursor-pointer">
-                {label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </nav>
+
+      {activeArea?.children.length > 1 && (
+        <div className="flex flex-wrap gap-1 mb-6 border-b border-slate-800 pb-px"
+          data-testid={`subnav-${activeArea.key}`}>
+          {activeArea.children.map(([l, label]) => (
+            <button key={l} type="button" data-testid={`subtab-${l}`} onClick={() => setLeaf(l)}
+              aria-current={leaf === l ? "page" : undefined}
+              className={`px-3.5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200 ${
+                leaf === l ? "border-amber-500 text-amber-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeArea?.children.length === 1 && <div className="mb-6" />}
 
       {content}
     </main>
