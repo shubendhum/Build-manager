@@ -1,4 +1,5 @@
 import uuid
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends
@@ -213,6 +214,17 @@ async def delete_project(project_id: str):
         raise HTTPException(status_code=404, detail="Project not found.")
     plans = await db.plan_analyses.find({"project_id": project_id}, {"_id": 0, "id": 1}).to_list(500)
     plan_ids = [p["id"] for p in plans]
+    # Unlink stored files BEFORE dropping the records that point at them,
+    # otherwise the uploads directory keeps growing with unreachable files.
+    for coll, field in ((db.documents, "file_path"), (db.plan_analyses, "file_path")):
+        async for doc in coll.find({"project_id": project_id}, {"_id": 0, field: 1}):
+            if doc.get(field):
+                Path(doc[field]).unlink(missing_ok=True)
+    async for quote in db.quotes.find({"project_id": project_id}, {"_id": 0, "attachment": 1}):
+        attachment = quote.get("attachment") or {}
+        if attachment.get("file_path"):
+            Path(attachment["file_path"]).unlink(missing_ok=True)
+
     # Every project-scoped collection, or deleting a project silently leaves
     # orphans behind (previously only tasks were cascaded).
     for collection in (db.tasks, db.work_packages, db.quotes, db.rfqs, db.notifications,

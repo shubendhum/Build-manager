@@ -41,8 +41,8 @@ from dashboard import dashboard_router  # noqa: E402
 from documents import documents_router  # noqa: E402
 from reports import reports_router  # noqa: E402
 from seed import seed_all  # noqa: E402
+from ai import vision_chat, image_content, text_content  # noqa: E402
 
-VLLM_VISION_URL = os.environ.get('VLLM_VISION_URL', 'http://host.docker.internal:8002/v1')
 
 UPLOAD_DIR = ROOT_DIR / 'uploads'
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -140,33 +140,25 @@ def parse_ai_response(raw: str) -> AnalysisData:
 
 
 async def run_ai_analysis(image_b64: str, stage_hint: Optional[str], notes: Optional[str]) -> AnalysisData:
-    """Call local vLLM vision model (Qwen3-VL-32B) for construction photo analysis."""
-    url = f"{VLLM_VISION_URL}/chat/completions"
-    payload = {
-        "model": "vllm-qwen3-vl-32b",
-        "messages": [
+    """Construction photo analysis.
+
+    Goes through ai.vision_chat like every other AI call, so the model name,
+    endpoint and reasoning settings live in exactly one place.
+    """
+    raw = await vision_chat(
+        [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
-                    {"type": "text", "text": build_user_prompt(stage_hint, notes)},
+                    image_content(image_b64),
+                    text_content(build_user_prompt(stage_hint, notes)),
                 ],
             },
         ],
-        "max_tokens": 1024,
-        "temperature": 0.0,
-    }
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        try:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            raw = data["choices"][0]["message"]["content"]
-        except httpx.HTTPError as e:
-            raise RuntimeError(f"Vision model request failed: {e}")
-        except (KeyError, IndexError) as e:
-            raise RuntimeError(f"Unexpected vision model response format: {e}")
+        max_tokens=1024,
+        timeout=120.0,
+    )
     return parse_ai_response(raw)
 
 
