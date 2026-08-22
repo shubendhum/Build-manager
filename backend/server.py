@@ -24,6 +24,7 @@ from auth import auth_router, get_current_user  # noqa: E402
 from projects import projects_router, tasks_router  # noqa: E402
 from trades import trades_router  # noqa: E402
 from quotes import quotes_router  # noqa: E402
+from packages import packages_router  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
 from variations import variations_router  # noqa: E402
 from diary import diary_router  # noqa: E402
@@ -278,6 +279,7 @@ app.include_router(projects_router)
 app.include_router(tasks_router)
 app.include_router(trades_router)
 app.include_router(quotes_router)
+app.include_router(packages_router)
 app.include_router(rfqs_router)
 app.include_router(public_rfqs_router)
 app.include_router(variations_router)
@@ -300,6 +302,11 @@ async def on_startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.tasks.create_index([("project_id", 1), ("sort_order", 1)])
+    await db.work_packages.create_index([("project_id", 1), ("sort_order", 1)])
+    await db.rfqs.create_index("invitations.token", unique=True, sparse=True)
+    await db.rfqs.create_index([("project_id", 1), ("package_id", 1)])
+    await db.quotes.create_index([("project_id", 1), ("package_id", 1)])
+    await db.notifications.create_index([("rfq_id", 1), ("created_at", -1)])
     await ensure_reference_rates()
     await seed_all()
 

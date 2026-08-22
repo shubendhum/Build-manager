@@ -8,6 +8,7 @@ import { ProjectOverview } from "@/components/ProjectOverview";
 import { PlannerTab } from "@/components/PlannerTab";
 import { RoadmapView } from "@/components/RoadmapView";
 import { ProjectTradesTab } from "@/components/ProjectTradesTab";
+import { PackagesTab } from "@/components/PackagesTab";
 import { QuotesTab } from "@/components/QuotesTab";
 import { InvoicesTab } from "@/components/InvoicesTab";
 import { BudgetTab } from "@/components/BudgetTab";
@@ -17,7 +18,7 @@ import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
-const TAB_VALUES = ["overview", "planner", "roadmap", "trades", "quotes", "invoices", "budget", "variations", "diary", "documents"];
+const TAB_VALUES = ["overview", "planner", "roadmap", "trades", "packages", "quotes", "invoices", "budget", "variations", "diary", "documents"];
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -89,6 +90,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="planner" data-testid="tab-planner">AI Planner</TabsTrigger>
           <TabsTrigger value="roadmap" data-testid="tab-roadmap">Roadmap &amp; Tasks</TabsTrigger>
           <TabsTrigger value="trades" data-testid="tab-trades">Trades</TabsTrigger>
+          <TabsTrigger value="packages" data-testid="tab-packages">Packages</TabsTrigger>
           <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
           <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
           <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
@@ -107,6 +109,9 @@ export default function ProjectDetailPage() {
         </TabsContent>
         <TabsContent value="trades" className="mt-6">
           <ProjectTradesTab projectId={project.id} />
+        </TabsContent>
+        <TabsContent value="packages" className="mt-6">
+          <PackagesTab projectId={project.id} />
         </TabsContent>
         <TabsContent value="quotes" className="mt-6">
           <QuotesTab projectId={project.id} />

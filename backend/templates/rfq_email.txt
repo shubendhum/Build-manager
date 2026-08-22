@@ -1,0 +1,24 @@
+Hi {{ contact_person or trade_name }},
+
+{{ builder_name }} is requesting a quote for the following works.
+
+PROJECT   {{ project_name }}
+SITE      {{ site_address }}
+PACKAGE   {{ package_title }}
+{% if due_date %}QUOTE DUE {{ due_date }}
+{% endif %}
+SCOPE OF WORKS
+{{ scope }}
+{% if documents %}
+DRAWINGS AND DOCUMENTS ({{ documents|length }})
+{% for doc in documents %}  - {{ doc.title }} ({{ doc.filename }})
+{% endfor %}
+Download them from the link below.
+{% endif %}
+Submit your quote here — no login needed, works on your phone:
+{{ portal_url }}
+
+This link is unique to {{ trade_name }}. Please don't forward it.
+
+Thanks,
+{{ builder_name }}

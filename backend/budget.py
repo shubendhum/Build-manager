@@ -19,7 +19,9 @@ async def compute_budget(project: dict) -> dict:
     est_lines = await db.estimate_lines.find({"project_id": project_id}, {"_id": 0}).to_list(1000)
     quotes = await db.quotes.find({"project_id": project_id}, {"_id": 0, "attachment": 0}).to_list(500)
     invoices = await db.invoices.find({"project_id": project_id}, {"_id": 0}).to_list(500)
+    packages = await db.work_packages.find({"project_id": project_id}, {"_id": 0, "id": 1, "title": 1}).to_list(500)
     quote_map = {q["id"]: q for q in quotes}
+    package_titles = {p["id"]: p["title"] for p in packages}
 
     def zero():
         return {"estimated": 0.0, "committed": 0.0, "invoiced": 0.0, "paid": 0.0}
@@ -33,10 +35,20 @@ async def compute_budget(project: dict) -> dict:
         if q["status"] == "accepted":
             stage_data.setdefault(q["stage_key"], zero())["committed"] += q["total_inc_gst"]
 
+    def wp_key(q: dict) -> str:
+        """Prefer the package record; fall back to the legacy free-text string."""
+        return q["package_id"] if q.get("package_id") else f"legacy:{q['work_package']}"
+
+    def wp_label(q: dict) -> str:
+        if q.get("package_id"):
+            return package_titles.get(q["package_id"], q.get("work_package") or "Untitled package")
+        return q["work_package"]
+
     wp_data = {}
     for q in quotes:
-        wp = wp_data.setdefault(q["work_package"], {"work_package": q["work_package"], "stage_key": q["stage_key"],
-                                                    "committed": 0.0, "invoiced": 0.0, "paid": 0.0})
+        wp = wp_data.setdefault(wp_key(q), {"work_package": wp_label(q), "package_id": q.get("package_id"),
+                                            "stage_key": q["stage_key"],
+                                            "committed": 0.0, "invoiced": 0.0, "paid": 0.0})
         if q["status"] == "accepted":
             wp["committed"] += q["total_inc_gst"]
 
@@ -48,7 +60,7 @@ async def compute_budget(project: dict) -> dict:
         stage_data.setdefault(stage, zero())["invoiced"] += inv["total_inc_gst"]
         stage_data[stage]["paid"] += paid
         if linked_quote:
-            wp = wp_data[linked_quote["work_package"]]
+            wp = wp_data[wp_key(linked_quote)]
             wp["invoiced"] += inv["total_inc_gst"]
             wp["paid"] += paid
         else:

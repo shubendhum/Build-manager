@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { HardHat, MapPin, CalendarClock, Loader2, CheckCircle2, Paperclip, X, AlertTriangle } from "lucide-react";
+import { HardHat, MapPin, CalendarClock, Loader2, CheckCircle2, Paperclip, X, AlertTriangle, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/projectUtils";
 import { autoGst } from "@/lib/tradeUtils";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return "";
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+};
 
 const Field = ({ label, children, className = "" }) => (
   <div className={`space-y-1.5 ${className}`}>
@@ -138,10 +146,36 @@ export default function QuotePortalPage() {
           </p>
         )}
 
-        <div className="rounded-md border border-slate-700 bg-card p-4 mb-6">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">Scope of works — {rfq.trade_name}</p>
+        <div className="rounded-md border border-slate-700 bg-card p-4 mb-4">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">
+            {rfq.package_title ? `${rfq.package_title} — ` : ""}Scope of works — {rfq.trade_name}
+          </p>
           <p className="text-sm text-slate-200 whitespace-pre-wrap" data-testid="portal-scope">{rfq.scope}</p>
         </div>
+
+        {rfq.documents?.length > 0 && (
+          <div className="rounded-md border border-slate-700 bg-card p-4 mb-6" data-testid="portal-documents">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2.5">
+              Drawings &amp; documents ({rfq.documents.length})
+            </p>
+            <div className="space-y-2">
+              {rfq.documents.map((doc) => (
+                <a key={doc.id} href={`${BACKEND_URL}/api/public/rfqs/${token}/documents/${doc.id}`}
+                  target="_blank" rel="noopener noreferrer" data-testid={`portal-document-${doc.id}`}
+                  className="flex items-center gap-3 rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2.5 hover:border-amber-500/50 transition-colors duration-200">
+                  <FileText className="h-4 w-4 text-amber-400 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm text-slate-200 truncate">{doc.title}</span>
+                    <span className="block text-[11px] text-slate-500 truncate">
+                      {doc.filename}{doc.file_size ? ` · ${formatFileSize(doc.file_size)}` : ""}
+                    </span>
+                  </span>
+                  <Download className="h-4 w-4 text-slate-500 shrink-0" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={submit} className="space-y-4">
           <h2 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Your Quote</h2>

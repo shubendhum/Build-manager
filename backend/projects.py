@@ -211,7 +211,15 @@ async def delete_project(project_id: str):
     result = await db.projects.delete_one({"id": project_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Project not found.")
-    await db.tasks.delete_many({"project_id": project_id})
+    plans = await db.plan_analyses.find({"project_id": project_id}, {"_id": 0, "id": 1}).to_list(500)
+    plan_ids = [p["id"] for p in plans]
+    # Every project-scoped collection, or deleting a project silently leaves
+    # orphans behind (previously only tasks were cascaded).
+    for collection in (db.tasks, db.work_packages, db.quotes, db.rfqs, db.notifications,
+                       db.invoices, db.claims, db.estimate_lines, db.variations,
+                       db.diary_entries, db.documents, db.plan_analyses):
+        await collection.delete_many({"project_id": project_id})
+    await db.plan_drafts.delete_many({"plan_id": {"$in": plan_ids}})
     await db.photo_analyses.update_many({"project_id": project_id}, {"$set": {"project_id": None}})
     return {"message": "Project deleted."}
 

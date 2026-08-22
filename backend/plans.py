@@ -444,9 +444,17 @@ class ApplyTask(BaseModel):
     description: str = ""
 
 
+class ApplyPackage(BaseModel):
+    title: str
+    trade_type: str = "other"
+    stage_key: str
+    scope: str = ""
+
+
 class ApplyLine(BaseModel):
     description: str
     stage_key: str
+    package_title: Optional[str] = None
     quantity: float = 1
     unit: str = ""
     rate: float = 0
@@ -458,6 +466,7 @@ class ApplyInput(BaseModel):
     draft_id: str
     tasks: List[ApplyTask] = []
     trade_types: List[str] = []
+    packages: List[ApplyPackage] = []
     estimate_lines: List[ApplyLine] = []
 
 
@@ -511,6 +520,43 @@ async def apply_draft(plan_id: str, data: ApplyInput):
     if task_docs:
         await db.tasks.insert_many([dict(d) for d in task_docs])
 
+    # Work packages — created first so estimate lines can be stamped with package_id
+    package_ids_by_title = {}
+    if data.packages:
+        last_pkg = await db.work_packages.find({"project_id": project_id}).sort("sort_order", -1).to_list(1)
+        pkg_sort = (last_pkg[0]["sort_order"] + 10) if last_pkg else 0
+        pkg_docs = []
+        for pkg in data.packages:
+            title = pkg.title.strip()
+            if not title or title in package_ids_by_title:
+                continue
+            existing = await db.work_packages.find_one({"project_id": project_id, "title": title}, {"_id": 0, "id": 1})
+            if existing:
+                package_ids_by_title[title] = existing["id"]
+                continue
+            pkg_id = str(uuid.uuid4())
+            package_ids_by_title[title] = pkg_id
+            pkg_docs.append({
+                "id": pkg_id,
+                "project_id": project_id,
+                "title": title,
+                "trade_type": pkg.trade_type if pkg.trade_type in TRADE_TYPES else "other",
+                "stage_key": pkg.stage_key,
+                "scope": pkg.scope.strip(),
+                "status": "draft",
+                "awarded_quote_id": None,
+                "awarded_trade_id": None,
+                "source": "planner",
+                "plan_id": plan_id,
+                "sort_order": pkg_sort,
+                "created_by": None,
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+            })
+            pkg_sort += 10
+        if pkg_docs:
+            await db.work_packages.insert_many([dict(d) for d in pkg_docs])
+
     # Estimate lines
     line_docs = []
     last = await db.estimate_lines.find({"project_id": project_id}).sort("sort_order", -1).to_list(1)
@@ -523,6 +569,7 @@ async def apply_draft(plan_id: str, data: ApplyInput):
             "project_id": project_id,
             "description": l.description.strip(),
             "stage_key": l.stage_key,
+            "package_id": package_ids_by_title.get((l.package_title or "").strip()),
             "rate_item_id": l.rate_item_id,
             "quantity": l.quantity,
             "unit": l.unit,

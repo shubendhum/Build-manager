@@ -1,0 +1,2 @@
+{{ builder_name }}: quote request for {{ package_title }} at {{ site_address }}.
+{% if due_date %}Due {{ due_date }}. {% endif %}{% if documents %}Drawings included. {% endif %}Submit here: {{ portal_url }}

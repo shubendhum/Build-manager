@@ -28,6 +28,7 @@ def today_str() -> str:
 
 class QuoteInput(BaseModel):
     work_package: str
+    package_id: Optional[str] = None
     trade_id: str
     stage_key: str
     amount_ex_gst: float
@@ -42,6 +43,7 @@ class QuoteInput(BaseModel):
 
 class QuoteUpdate(BaseModel):
     work_package: Optional[str] = None
+    package_id: Optional[str] = None
     trade_id: Optional[str] = None
     stage_key: Optional[str] = None
     amount_ex_gst: Optional[float] = None
@@ -54,9 +56,12 @@ class QuoteUpdate(BaseModel):
     status: Optional[str] = None
 
 
-async def validate_quote_refs(trade_id: Optional[str], stage_key: Optional[str], status: Optional[str]):
+async def validate_quote_refs(trade_id: Optional[str], stage_key: Optional[str], status: Optional[str],
+                              package_id: Optional[str] = None):
     if trade_id is not None and not await db.trades.find_one({"id": trade_id}):
         raise HTTPException(status_code=404, detail="Trade not found.")
+    if package_id is not None and not await db.work_packages.find_one({"id": package_id}):
+        raise HTTPException(status_code=404, detail="Work package not found.")
     if stage_key is not None and stage_key not in STAGE_KEYS:
         raise HTTPException(status_code=400, detail=f"stage_key must be one of: {sorted(STAGE_KEYS)}")
     if status is not None and status not in QUOTE_STATUSES:
@@ -91,7 +96,7 @@ async def create_quote(project_id: str, data: QuoteInput):
         raise HTTPException(status_code=404, detail="Project not found.")
     if not data.work_package.strip():
         raise HTTPException(status_code=400, detail="Work package title is required.")
-    await validate_quote_refs(data.trade_id, data.stage_key, data.status)
+    await validate_quote_refs(data.trade_id, data.stage_key, data.status, data.package_id)
     quote = data.model_dump()
     quote["work_package"] = quote["work_package"].strip()
     quote["id"] = str(uuid.uuid4())
@@ -109,7 +114,8 @@ async def update_quote(quote_id: str, data: QuoteUpdate):
     if not await db.quotes.find_one({"id": quote_id}):
         raise HTTPException(status_code=404, detail="Quote not found.")
     updates = data.model_dump(exclude_unset=True)
-    await validate_quote_refs(updates.get("trade_id"), updates.get("stage_key"), updates.get("status"))
+    await validate_quote_refs(updates.get("trade_id"), updates.get("stage_key"), updates.get("status"),
+                              updates.get("package_id"))
     updates["updated_at"] = now_iso()
     await db.quotes.update_one({"id": quote_id}, {"$set": updates})
     quote = await db.quotes.find_one({"id": quote_id}, {"_id": 0, "attachment.file_path": 0})
@@ -133,10 +139,22 @@ async def accept_quote(quote_id: str):
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found.")
     await db.quotes.update_one({"id": quote_id}, {"$set": {"status": "accepted", "updated_at": now_iso()}})
+    # Siblings are scoped by package when the quote has one; pre-migration quotes
+    # still group by the free-text work_package string.
+    if quote.get("package_id"):
+        sibling_filter = {"project_id": quote["project_id"], "package_id": quote["package_id"]}
+    else:
+        sibling_filter = {"project_id": quote["project_id"], "work_package": quote["work_package"]}
     result = await db.quotes.update_many(
-        {"project_id": quote["project_id"], "work_package": quote["work_package"], "id": {"$ne": quote_id}},
+        {**sibling_filter, "id": {"$ne": quote_id}},
         {"$set": {"status": "rejected", "updated_at": now_iso()}},
     )
+    if quote.get("package_id"):
+        await db.work_packages.update_one(
+            {"id": quote["package_id"]},
+            {"$set": {"status": "awarded", "awarded_quote_id": quote_id,
+                      "awarded_trade_id": quote.get("trade_id"), "updated_at": now_iso()}},
+        )
     quote["status"] = "accepted"
     return {"accepted": (await attach_trade_names([quote]))[0], "rejected_count": result.modified_count}
 

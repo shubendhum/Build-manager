@@ -20,6 +20,7 @@ def now_iso() -> str:
 class EstimateLineInput(BaseModel):
     description: str
     stage_key: str
+    package_id: Optional[str] = None
     rate_item_id: Optional[str] = None
     quantity: float = 1
     unit: str = ""
@@ -30,6 +31,7 @@ class EstimateLineInput(BaseModel):
 class EstimateLineUpdate(BaseModel):
     description: Optional[str] = None
     stage_key: Optional[str] = None
+    package_id: Optional[str] = None
     rate_item_id: Optional[str] = None
     quantity: Optional[float] = None
     unit: Optional[str] = None
