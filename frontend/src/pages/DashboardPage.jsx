@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { FolderKanban, Activity, DollarSign, ReceiptText, ArrowRight, Loader2, Plus, FileUp, Send, NotebookPen } from "lucide-react";
+import { Building2, Activity, DollarSign, ReceiptText, ArrowRight, Loader2, Plus, FileUp, Send, NotebookPen } from "lucide-react";
 import api from "@/lib/api";
 import { formatAUD, formatMoney } from "@/lib/projectUtils";
 import { ProjectFormDialog } from "@/components/ProjectFormDialog";
@@ -74,8 +74,19 @@ export default function DashboardPage() {
       <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Overview</p>
       <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100 mb-6">Dashboard</h1>
 
+      <section className="mb-10" data-testid="portfolio-section">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-100">Your Jobs</h2>
+          <Link to="/projects" data-testid="dashboard-view-projects-link"
+            className="inline-flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300 transition-colors duration-200">
+            All jobs <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+        <PortfolioList portfolio={portfolio} />
+      </section>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10" data-testid="quick-actions-row">
-        <QuickAction icon={Plus} label="New Project" sub="Roadmap auto-generated" testId="quick-action-new-project"
+        <QuickAction icon={Plus} label="New Job" sub="Roadmap auto-generated" testId="quick-action-new-project"
           onClick={() => setProjectFormOpen(true)} />
         <QuickAction icon={FileUp} label="Upload Plans" sub="AI reads your drawings" testId="quick-action-upload-plans"
           onClick={() => goToProjectTab("planner")} />
@@ -86,9 +97,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <StatCard icon={FolderKanban} label="Projects" value={portfolio.length} testId="stat-total-projects" />
+        <StatCard icon={Building2} label="Jobs" value={portfolio.length} testId="stat-total-projects" />
         <StatCard icon={Activity} label="Active" value={active.length} testId="stat-active-projects" />
-        <StatCard icon={DollarSign} label="Portfolio Value" value={formatAUD(totalValue)} testId="stat-portfolio-value" />
+        <StatCard icon={DollarSign} label="Total Value" value={formatAUD(totalValue)} testId="stat-portfolio-value" />
         <StatCard icon={ReceiptText} label="Overdue Invoices" value={overdue_invoices.count}
           sub={overdue_invoices.count ? `${formatMoney(overdue_invoices.total_balance)} outstanding` : "All within terms"}
           testId="stat-overdue-invoices" />
@@ -99,20 +110,7 @@ export default function DashboardPage() {
         <OverdueInvoicesWidget data={overdue_invoices} />
         <TradeWarningsWidget warnings={trade_warnings} />
         <UpcomingTasksWidget tasks={upcoming_tasks} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
         <ClaimsSnapshotWidget snapshot={claims_snapshot} />
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-slate-100">Portfolio</h2>
-            <Link to="/projects" data-testid="dashboard-view-projects-link"
-              className="inline-flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300 transition-colors duration-200">
-              All projects <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-          <PortfolioList portfolio={portfolio} />
-        </div>
       </div>
 
       <ProjectFormDialog open={projectFormOpen} onOpenChange={setProjectFormOpen}
