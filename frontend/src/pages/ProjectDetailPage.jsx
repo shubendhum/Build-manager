@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NextSteps } from "@/components/NextSteps";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { PlannerTab } from "@/components/PlannerTab";
 import { RoadmapView } from "@/components/RoadmapView";
@@ -18,18 +19,50 @@ import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
-const TAB_VALUES = ["overview", "planner", "roadmap", "trades", "packages", "quotes", "invoices", "budget", "variations", "diary", "documents"];
+// Eleven flat tabs meant the order of the job lived in the user's head. These
+// six groups follow how a build actually runs. The URL still carries the LEAF
+// (?tab=packages), so every existing deep link keeps working.
+const TAB_GROUPS = [
+  { key: "overview", label: "Overview", children: [["overview", "Overview"]] },
+  { key: "plan", label: "Plan", children: [["planner", "AI Planner"]] },
+  { key: "procure", label: "Procure", children: [
+    ["packages", "Packages"], ["trades", "Trades"], ["quotes", "Quotes"],
+  ] },
+  { key: "build", label: "Build", children: [
+    ["roadmap", "Roadmap & Tasks"], ["diary", "Site Diary"],
+  ] },
+  { key: "money", label: "Money", children: [
+    ["budget", "Budget"], ["invoices", "Invoices"], ["variations", "Variations"],
+  ] },
+  { key: "files", label: "Files", children: [["documents", "Documents"]] },
+];
+
+const LEAF_TO_GROUP = {};
+TAB_GROUPS.forEach((g) => g.children.forEach(([leaf]) => { LEAF_TO_GROUP[leaf] = g.key; }));
+const LEAVES = Object.keys(LEAF_TO_GROUP);
+
+const CountChip = ({ n, testId }) =>
+  n > 0 ? (
+    <span data-testid={testId}
+      className="ml-1.5 inline-flex items-center justify-center min-w-[1.15rem] h-[1.15rem] px-1 rounded-full bg-amber-500 text-slate-950 text-[10px] font-bold tabular-nums">
+      {n}
+    </span>
+  ) : null;
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
+  const [steps, setSteps] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
   const requested = searchParams.get("tab");
-  const tab = TAB_VALUES.includes(requested) ? requested : "overview";
-  const setTab = (v) => setSearchParams(v === "overview" ? {} : { tab: v }, { replace: true });
+  const leaf = LEAVES.includes(requested) ? requested : "overview";
+  const group = LEAF_TO_GROUP[leaf];
+
+  const setLeaf = (v) => setSearchParams(v === "overview" ? {} : { tab: v }, { replace: true });
+  const setGroup = (g) => setLeaf(TAB_GROUPS.find((x) => x.key === g).children[0][0]);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -40,7 +73,23 @@ export default function ProjectDetailPage() {
     }
   }, [projectId]);
 
+  const fetchSteps = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/projects/${projectId}/next-steps`);
+      setSteps(data);
+    } catch {
+      setSteps(null);   // never block the page on the advisory panel
+    }
+  }, [projectId]);
+
+  const refresh = useCallback(() => { fetchProject(); fetchSteps(); }, [fetchProject, fetchSteps]);
+
   useEffect(() => { fetchProject(); }, [fetchProject]);
+  // Re-read on navigation so counts reflect whatever you just did in another tab.
+  useEffect(() => { fetchSteps(); }, [fetchSteps, leaf]);
+
+  const badges = steps?.badges || {};
+  const groupCount = (g) => g.children.reduce((n, [l]) => n + (badges[l] || 0), 0);
 
   if (notFound) {
     return (
@@ -52,6 +101,22 @@ export default function ProjectDetailPage() {
   if (!project) {
     return <main className="max-w-7xl mx-auto px-6 py-12"><p className="text-sm text-slate-400">Loading project…</p></main>;
   }
+
+  const activeGroup = TAB_GROUPS.find((g) => g.key === group);
+
+  const leafContent = {
+    overview: <><NextSteps data={steps} onGo={setLeaf} /><ProjectOverview project={project} onChanged={refresh} /></>,
+    planner: <PlannerTab project={project} onChanged={refresh} />,
+    packages: <PackagesTab projectId={project.id} />,
+    trades: <ProjectTradesTab projectId={project.id} />,
+    quotes: <QuotesTab projectId={project.id} />,
+    roadmap: <RoadmapView projectId={project.id} onProgressChanged={refresh} />,
+    diary: <PhotosTab project={project} />,
+    budget: <BudgetTab project={project} />,
+    invoices: <InvoicesTab projectId={project.id} contractValue={project.contract_value} />,
+    variations: <VariationsTab projectId={project.id} />,
+    documents: <DocumentsTab projectId={project.id} />,
+  };
 
   return (
     <main className="max-w-7xl mx-auto px-6 py-10" data-testid="project-detail-page">
@@ -84,53 +149,37 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={group} onValueChange={setGroup}>
         <TabsList className="bg-slate-800/60 h-auto max-w-full justify-start overflow-x-auto flex-nowrap md:flex-wrap">
-          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-          <TabsTrigger value="planner" data-testid="tab-planner">AI Planner</TabsTrigger>
-          <TabsTrigger value="roadmap" data-testid="tab-roadmap">Roadmap &amp; Tasks</TabsTrigger>
-          <TabsTrigger value="trades" data-testid="tab-trades">Trades</TabsTrigger>
-          <TabsTrigger value="packages" data-testid="tab-packages">Packages</TabsTrigger>
-          <TabsTrigger value="quotes" data-testid="tab-quotes">Quotes</TabsTrigger>
-          <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="budget" data-testid="tab-budget">Budget</TabsTrigger>
-          <TabsTrigger value="variations" data-testid="tab-variations">Variations</TabsTrigger>
-          <TabsTrigger value="diary" data-testid="tab-diary">Site Diary</TabsTrigger>
-          <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
+          {TAB_GROUPS.map((g) => (
+            <TabsTrigger key={g.key} value={g.key} data-testid={`tab-${g.key}`}>
+              {g.label}
+              <CountChip n={groupCount(g)} testId={`tab-badge-${g.key}`} />
+            </TabsTrigger>
+          ))}
         </TabsList>
-        <TabsContent value="overview" className="mt-6">
-          <ProjectOverview project={project} onChanged={fetchProject} />
-        </TabsContent>
-        <TabsContent value="planner" className="mt-6">
-          <PlannerTab project={project} onChanged={fetchProject} />
-        </TabsContent>
-        <TabsContent value="roadmap" className="mt-6">
-          <RoadmapView projectId={project.id} onProgressChanged={fetchProject} />
-        </TabsContent>
-        <TabsContent value="trades" className="mt-6">
-          <ProjectTradesTab projectId={project.id} />
-        </TabsContent>
-        <TabsContent value="packages" className="mt-6">
-          <PackagesTab projectId={project.id} />
-        </TabsContent>
-        <TabsContent value="quotes" className="mt-6">
-          <QuotesTab projectId={project.id} />
-        </TabsContent>
-        <TabsContent value="invoices" className="mt-6">
-          <InvoicesTab projectId={project.id} contractValue={project.contract_value} />
-        </TabsContent>
-        <TabsContent value="budget" className="mt-6">
-          <BudgetTab project={project} />
-        </TabsContent>
-        <TabsContent value="variations" className="mt-6">
-          <VariationsTab projectId={project.id} />
-        </TabsContent>
-        <TabsContent value="diary" className="mt-6">
-          <PhotosTab project={project} />
-        </TabsContent>
-        <TabsContent value="documents" className="mt-6">
-          <DocumentsTab projectId={project.id} />
-        </TabsContent>
+
+        {TAB_GROUPS.map((g) => (
+          <TabsContent key={g.key} value={g.key} className="mt-6">
+            {g.children.length > 1 && (
+              <div className="flex flex-wrap gap-1 mb-6 border-b border-slate-800 pb-px" data-testid={`subnav-${g.key}`}>
+                {g.children.map(([l, label]) => (
+                  <button key={l} type="button" data-testid={`subtab-${l}`} onClick={() => setLeaf(l)}
+                    aria-current={leaf === l ? "page" : undefined}
+                    className={`inline-flex items-center rounded-t-md px-3.5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200 ${
+                      leaf === l
+                        ? "border-amber-500 text-amber-400"
+                        : "border-transparent text-slate-400 hover:text-slate-200"
+                    }`}>
+                    {label}
+                    <CountChip n={badges[l] || 0} testId={`subtab-badge-${l}`} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {g.key === group && leafContent[leaf]}
+          </TabsContent>
+        ))}
       </Tabs>
     </main>
   );
