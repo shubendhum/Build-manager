@@ -69,6 +69,16 @@ def redirect_uri() -> str:
     return f"{base}/api/integrations/gmail/callback" if base else ""
 
 
+def send_as() -> str:
+    """The address quote requests go out from.
+
+    Gmail only accepts a From that is a verified send-as alias on the account;
+    anything else is rejected or silently rewritten. Empty means "use the
+    account's own address".
+    """
+    return _env("GMAIL_SEND_AS")
+
+
 def configured() -> bool:
     return bool(client_id() and client_secret() and redirect_uri())
 
@@ -235,7 +245,7 @@ async def send_message(to: str, subject: str, html: str, text: str,
     """Send as the connected mailbox. Returns Gmail's id and threadId."""
     token = await access_token()
     doc = await get_integration() or {}
-    sender = doc.get("email_address") or "me"
+    sender = send_as() or doc.get("email_address") or "me"
 
     msg = build_mime(to, subject, html, text, sender, reply_to)
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
@@ -330,3 +340,19 @@ def attachments_in(payload: dict) -> list:
                 "size": body.get("size", 0),
             })
     return found
+
+
+async def list_aliases() -> list:
+    """Verified send-as addresses on the connected account."""
+    token = await access_token()
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        resp = await client.get(f"{GMAIL_API}/settings/sendAs",
+                                headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code >= 400:
+        return []
+    return [
+        {"email": a.get("sendAsEmail"),
+         "is_primary": bool(a.get("isPrimary")),
+         "verified": a.get("verificationStatus") in (None, "accepted")}
+        for a in resp.json().get("sendAs", [])
+    ]

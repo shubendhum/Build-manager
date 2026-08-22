@@ -16,6 +16,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 import gmail
 import notify
@@ -66,6 +67,55 @@ async def gmail_authorize():
                    "and a redirect URI must be configured in backend/.env.",
         )
     return {"auth_url": await gmail.build_auth_url()}
+
+
+@integrations_router.get("/integrations/gmail/aliases")
+async def gmail_aliases():
+    status = await gmail.public_status()
+    if not status["connected"]:
+        raise HTTPException(status_code=400, detail="Gmail is not connected.")
+    return {"send_as": gmail.send_as() or status["email_address"],
+            "aliases": await gmail.list_aliases()}
+
+
+class TestSendInput(BaseModel):
+    to: str
+
+
+@integrations_router.post("/integrations/gmail/test")
+async def gmail_test_send(data: TestSendInput):
+    """Prove the connection end to end by sending one real message."""
+    status = await gmail.public_status()
+    if not status["connected"]:
+        raise HTTPException(status_code=400, detail="Gmail is not connected.")
+    if "@" not in data.to:
+        raise HTTPException(status_code=400, detail="That doesn't look like an email address.")
+
+    sender = gmail.send_as() or status["email_address"]
+    html = (
+        "<div style=\"font-family:-apple-system,Segoe UI,Arial,sans-serif;color:#0f172a\">"
+        "<p style=\"font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#b45309;"
+        "font-weight:600;margin:0 0 6px\">BuildManager VIC</p>"
+        "<h2 style=\"margin:0 0 12px;font-size:18px\">Email connection test</h2>"
+        f"<p>This message was sent from <strong>{sender}</strong> through your connected Gmail account.</p>"
+        "<p>If you reply to it, the reply lands back in your inbox as normal. Replies to a real "
+        "<em>quote request</em> are additionally read into the job and turned into a draft price "
+        "for you to confirm.</p>"
+        "<p style=\"font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:12px\">"
+        "Nothing was sent to any tradie — this went only to the address you nominated.</p></div>"
+    )
+    text = (
+        "BuildManager VIC — email connection test\n\n"
+        f"Sent from {sender} through your connected Gmail account.\n\n"
+        "Replies to a real quote request are read back into the job and turned into a "
+        "draft price for you to confirm.\n\n"
+        "Nothing was sent to any tradie."
+    )
+    try:
+        sent = await gmail.send_message(data.to, "BuildManager — email connection test", html, text)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"message": f"Test email sent to {data.to}.", "sent_from": sender, **sent}
 
 
 @integrations_router.post("/integrations/gmail/disconnect")
