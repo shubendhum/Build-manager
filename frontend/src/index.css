@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,8 +11,12 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* RLD sets everything in Inter; headings differ by weight and tracking,
+   not by family. .font-heading is kept so no component needs editing. */
 h1, h2, h3, h4, .font-heading {
-    font-family: 'Barlow', 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.015em;
 }
 
 code {
@@ -20,31 +24,47 @@ code {
 }
 
 @layer base {
+    /* RLD Technologies design tokens — shared with the RLD client portal,
+       rld-proposal and rld-pulse-demo. Raw brand hexes for gradients and
+       non-Tailwind consumers. */
     :root {
-        --background: 222.2 47.4% 11.2%;
-        --foreground: 210 40% 98%;
-        --card: 222.2 47.4% 15%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222.2 47.4% 13%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 38 92% 50%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 217.2 32.6% 20%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 215 27.9% 16.9%;
-        --muted-foreground: 215 20.2% 65.1%;
-        --accent: 217.2 32.6% 22%;
-        --accent-foreground: 210 40% 98%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 217.2 32.6% 25%;
-        --input: 217.2 32.6% 25%;
-        --ring: 38 92% 50%;
-        --chart-1: 38 92% 50%;
-        --chart-2: 142.1 76.2% 36.3%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
+        --rld-teal: #0da6b8;
+        --rld-teal-600: #0a8b9c;
+        --rld-aqua: #34cfd6;
+        --rld-sky: #1c9be0;
+        --rld-azure: #2e86de;
+        --rld-deep: #0a2e39;
+        --rld-ink: #10212a;
+        --rld-canvas: #ecf3f5;
+        --rld-gradient: linear-gradient(120deg, #0da6b8 0%, #1c9be0 42%, #2e86de 70%, #34cfd6 100%);
+    }
+
+    /* This app runs dark, so RLD's dark values are the defaults here. */
+    :root {
+        --background: 196 70% 13%;      /* #0A2E39 deep */
+        --foreground: 193 25% 94%;
+        --card: 195 40% 17%;            /* #103F4C deep-2 */
+        --card-foreground: 193 25% 94%;
+        --popover: 195 40% 17%;
+        --popover-foreground: 193 25% 94%;
+        --primary: 183 65% 52%;         /* aqua reads better on deep */
+        --primary-foreground: 196 70% 13%;
+        --secondary: 195 40% 20%;
+        --secondary-foreground: 193 25% 94%;
+        --muted: 195 40% 20%;
+        --muted-foreground: 193 15% 68%;
+        --accent: 190 45% 24%;
+        --accent-foreground: 187 60% 80%;
+        --destructive: 2 76% 59%;       /* #E5484D */
+        --destructive-foreground: 0 0% 100%;
+        --border: 195 30% 24%;
+        --input: 195 30% 24%;
+        --ring: 183 65% 52%;
+        --chart-1: 183 65% 52%;
+        --chart-2: 202 78% 49%;
+        --chart-3: 212 72% 52%;
+        --chart-4: 188 86% 45%;
+        --chart-5: 155 70% 45%;
         --radius: 0.5rem;
     }
 }
@@ -57,7 +77,7 @@ code {
         @apply bg-background text-foreground;
     }
     ::selection {
-        background: hsl(38 92% 50% / 0.35);
+        background: hsl(183 65% 52% / 0.35);   /* RLD aqua */
         color: hsl(210 40% 98%);
     }
 }
@@ -68,14 +88,14 @@ code {
     height: 10px;
 }
 ::-webkit-scrollbar-track {
-    background: hsl(222.2 47.4% 11.2%);
+    background: hsl(196 70% 13%);   /* RLD deep */
 }
 ::-webkit-scrollbar-thumb {
-    background: hsl(217.2 32.6% 25%);
+    background: hsl(195 30% 24%);   /* RLD border */
     border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: hsl(38 92% 50% / 0.6);
+    background: hsl(183 65% 52% / 0.6);   /* RLD aqua */
 }
 
 @layer base {

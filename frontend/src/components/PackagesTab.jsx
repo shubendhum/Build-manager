@@ -105,9 +105,9 @@ const PackageRow = ({ pkg, onRequest, onEdit, onDelete }) => {
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button data-testid={`package-delete-${pkg.id}`}
-              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200">
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
+              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200" title="Delete" aria-label="Delete">
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
           </AlertDialogTrigger>
           <AlertDialogContent className="bg-card border-slate-700">
             <AlertDialogHeader>

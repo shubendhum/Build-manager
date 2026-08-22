@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MapPin, ChevronDown } from "lucide-react";
+import { ArrowLeft, MapPin, ChevronDown, Hammer, FileSearch, CalendarDays, Wallet, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -26,10 +26,10 @@ import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 // trade on the Work board. Everything else is reference material and sits behind
 // More, so the main bar stays at four choices.
 const MAIN = [
-  ["work", "Work"],
-  ["planner", "Plan"],
-  ["roadmap", "Program"],
-  ["budget", "Costs"],
+  ["work", "Work", Hammer],          // who is doing what, and where it is up to
+  ["planner", "Plan", FileSearch],   // read the drawings
+  ["roadmap", "Schedule", CalendarDays],
+  ["budget", "Costs", Wallet],
 ];
 
 const MORE = [
@@ -137,8 +137,8 @@ export default function ProjectDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <button data-testid="back-to-projects" onClick={() => navigate("/projects")}
-            className="text-slate-500 hover:text-amber-400 transition-colors duration-200 shrink-0" title="All projects">
-            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+            className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-amber-400 transition-colors duration-200 shrink-0">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> All jobs
           </button>
           <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-100 truncate" data-testid="project-title">
             {project.name}
@@ -164,15 +164,17 @@ export default function ProjectDetailPage() {
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 mb-6 border-b border-slate-800 pb-3" aria-label="Project sections">
-        {MAIN.map(([k, label]) => (
+        {MAIN.map(([k, label, Icon]) => (
           <button key={k} type="button" data-testid={`tab-${k}`} onClick={() => setLeaf(k)}
-            aria-current={leaf === k ? "page" : undefined} className={tabCls(leaf === k)}>
-            {label}
+            aria-current={leaf === k ? "page" : undefined}
+            className={`${tabCls(leaf === k)} inline-flex items-center gap-2`}>
+            <Icon className="h-4 w-4" aria-hidden="true" /> {label}
           </button>
         ))}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" data-testid="tab-more" className={`${tabCls(moreActive)} inline-flex items-center gap-1`}>
+              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
               {moreActive ? moreLabel : "More"} <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>

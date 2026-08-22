@@ -1,14 +1,16 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { HardHat, LayoutDashboard, FolderKanban, ScanSearch, LogOut, Hammer, BookOpen, Settings } from "lucide-react";
+import { HardHat, Home, Building2, Users, Calculator, Camera, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GlobalSearch } from "@/components/GlobalSearch";
 
+// Icons are literal (a building means jobs, people mean tradies) and every one
+// carries its label — including on mobile, where they used to be bare glyphs.
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true, testId: "nav-dashboard" },
-  { to: "/projects", label: "Projects", icon: FolderKanban, end: false, testId: "nav-projects" },
-  { to: "/trades", label: "Trades", icon: Hammer, end: false, testId: "nav-trades" },
-  { to: "/rates", label: "Rate Guide", icon: BookOpen, end: false, testId: "nav-rates" },
-  { to: "/analyzer", label: "Photo Analyzer", icon: ScanSearch, end: false, testId: "nav-analyzer" },
+  { to: "/", label: "Home", icon: Home, end: true, testId: "nav-dashboard" },
+  { to: "/projects", label: "Jobs", icon: Building2, end: false, testId: "nav-projects" },
+  { to: "/trades", label: "Tradies", icon: Users, end: false, testId: "nav-trades" },
+  { to: "/rates", label: "Prices", icon: Calculator, end: false, testId: "nav-rates" },
+  { to: "/analyzer", label: "Photos", icon: Camera, end: false, testId: "nav-analyzer" },
   { to: "/settings", label: "Settings", icon: Settings, end: false, testId: "nav-settings" },
 ];
 
@@ -24,8 +26,8 @@ export const AppShell = () => {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-slate-800 bg-slate-900/80 backdrop-blur-xl z-40">
         <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
-          <div className="h-9 w-9 rounded-md bg-amber-500 flex items-center justify-center shrink-0">
-            <HardHat className="h-5 w-5 text-slate-950" aria-hidden="true" />
+          <div className="h-9 w-9 rounded-md flex items-center justify-center shrink-0" style={{ background: "var(--rld-gradient)" }}>
+            <HardHat className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div>
             <p className="font-heading text-base font-bold tracking-tight text-slate-100 leading-none">
@@ -59,20 +61,25 @@ export const AppShell = () => {
       {/* Mobile top bar */}
       <header className="md:hidden sticky top-0 z-40 backdrop-blur-xl bg-slate-900/85 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-y-2">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-md bg-amber-500 flex items-center justify-center">
-            <HardHat className="h-4 w-4 text-slate-950" aria-hidden="true" />
+          <div className="h-8 w-8 rounded-md flex items-center justify-center" style={{ background: "var(--rld-gradient)" }}>
+            <HardHat className="h-4 w-4 text-white" aria-hidden="true" />
           </div>
           <p className="font-heading text-sm font-bold text-slate-100">BuildManager <span className="text-amber-400">VIC</span></p>
         </div>
         <div className="flex items-center gap-1">
           {NAV.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} data-testid={`${item.testId}-mobile`}
-              className={({ isActive }) => `p-2 rounded-md ${isActive ? "text-amber-400 bg-amber-500/10" : "text-slate-400"}`}>
+              title={item.label}
+              className={({ isActive }) => `flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md ${
+                isActive ? "text-amber-400 bg-amber-500/10" : "text-slate-400"}`}>
               <item.icon className="h-5 w-5" aria-hidden="true" />
+              <span className="text-[10px] font-medium leading-none">{item.label}</span>
             </NavLink>
           ))}
-          <button data-testid="logout-button-mobile" onClick={logout} className="p-2 rounded-md text-slate-400 hover:text-amber-400">
+          <button data-testid="logout-button-mobile" onClick={logout} title="Sign out"
+            className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md text-slate-400 hover:text-amber-400">
             <LogOut className="h-5 w-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium leading-none">Out</span>
           </button>
         </div>
         <div className="w-full">

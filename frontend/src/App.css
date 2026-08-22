@@ -2,7 +2,7 @@
 
 .blueprint-grid {
     background-image:
-        linear-gradient(hsl(217.2 32.6% 25% / 0.25) 1px, transparent 1px),
-        linear-gradient(90deg, hsl(217.2 32.6% 25% / 0.25) 1px, transparent 1px);
+        linear-gradient(hsl(195 30% 24% / 0.35) 1px, transparent 1px),
+        linear-gradient(90deg, hsl(195 30% 24% / 0.35) 1px, transparent 1px);
     background-size: 48px 48px;
 }
