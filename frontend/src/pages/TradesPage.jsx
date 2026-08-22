@@ -61,13 +61,14 @@ export default function TradesPage() {
             transition={{ duration: 0.3, delay: Math.min(idx * 0.05, 0.35) }}>
             <TradeCard
               trade={t}
+              onOpen={(trade) => { setEditing(trade); setFormOpen(true); }}
               actions={
                 <>
-                  <button data-testid={`trade-edit-${t.id}`} onClick={() => { setEditing(t); setFormOpen(true); }}
+                  <button data-testid={`trade-edit-${t.id}`} onClick={(e) => { e.stopPropagation(); setEditing(t); setFormOpen(true); }}
                     className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 transition-colors duration-200">
                     <Pencil className="h-4 w-4" aria-hidden="true" />
                   </button>
-                  <button data-testid={`trade-delete-${t.id}`} onClick={() => remove(t)}
+                  <button data-testid={`trade-delete-${t.id}`} onClick={(e) => { e.stopPropagation(); remove(t); }}
                     className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200">
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>

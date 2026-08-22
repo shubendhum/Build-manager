@@ -21,6 +21,7 @@ class InvoiceInput(BaseModel):
     invoice_number: str
     trade_id: Optional[str] = None
     quote_id: Optional[str] = None
+    package_id: Optional[str] = None
     description: str = ""
     amount_ex_gst: float
     gst_amount: float

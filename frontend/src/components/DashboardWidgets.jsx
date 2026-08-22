@@ -19,11 +19,12 @@ export const InspectionsWidget = ({ inspections }) => (
     {inspections.length === 0 && <p className="text-sm text-slate-500" data-testid="inspections-empty">No upcoming mandatory inspections.</p>}
     <ul className="space-y-3">
       {inspections.map((i) => (
-        <li key={i.task_id} className="flex items-start justify-between gap-3" data-testid={`inspection-${i.task_id}`}>
+        <li key={i.task_id} data-testid={`inspection-${i.task_id}`}>
+          <Link to={`/projects/${i.project_id}?tab=roadmap`} className="flex items-start justify-between gap-3 rounded-md -mx-2 px-2 py-1.5 hover:bg-slate-800/60 transition-colors duration-200">
           <div>
-            <Link to={`/projects/${i.project_id}`} className="text-sm text-slate-200 hover:text-amber-400 transition-colors duration-200">
+            <span className="text-sm text-slate-200">
               {i.title.replace("MANDATORY INSPECTION: ", "")}
-            </Link>
+            </span>
             <p className="text-xs text-slate-500">{i.project_name} · {roadmapStageLabel(i.stage_key)}</p>
           </div>
           {i.unscheduled ? (
@@ -40,6 +41,7 @@ export const InspectionsWidget = ({ inspections }) => (
               Due in {i.days_until}d
             </Badge>
           )}
+          </Link>
         </li>
       ))}
     </ul>
@@ -57,12 +59,14 @@ export const OverdueInvoicesWidget = ({ data }) => (
         </p>
         <ul className="space-y-2">
           {data.items.map((i) => (
-            <li key={i.invoice_id} className="flex items-center justify-between gap-3 text-sm" data-testid={`overdue-invoice-${i.invoice_id}`}>
-              <div>
-                <Link to={`/projects/${i.project_id}`} className="text-slate-200 hover:text-amber-400 transition-colors duration-200">{i.invoice_number}</Link>
-                <span className="text-xs text-slate-500 ml-2">{i.trade_name || i.project_name}</span>
-              </div>
-              <span className="text-red-400 font-medium whitespace-nowrap">{formatMoney(i.balance)}</span>
+            <li key={i.invoice_id} data-testid={`overdue-invoice-${i.invoice_id}`}>
+              <Link to={`/projects/${i.project_id}?tab=invoices`} className="flex items-center justify-between gap-3 text-sm rounded-md -mx-2 px-2 py-1.5 hover:bg-slate-800/60 transition-colors duration-200">
+                <span>
+                  <span className="text-slate-200">{i.invoice_number}</span>
+                  <span className="text-xs text-slate-500 ml-2">{i.trade_name || i.project_name}</span>
+                </span>
+                <span className="text-red-400 font-medium whitespace-nowrap">{formatMoney(i.balance)}</span>
+              </Link>
             </li>
           ))}
         </ul>
@@ -76,8 +80,9 @@ export const TradeWarningsWidget = ({ warnings }) => (
     {warnings.length === 0 && <p className="text-sm text-slate-500" data-testid="trade-warnings-empty">All trade credentials current.</p>}
     <ul className="space-y-3">
       {warnings.map((t) => (
-        <li key={t.trade_id} className="flex items-start justify-between gap-3" data-testid={`trade-warning-item-${t.trade_id}`}>
-          <Link to="/trades" className="text-sm text-slate-200 hover:text-amber-400 transition-colors duration-200">{t.business_name}</Link>
+        <li key={t.trade_id} data-testid={`trade-warning-item-${t.trade_id}`}>
+          <Link to="/trades" className="flex items-start justify-between gap-3 rounded-md -mx-2 px-2 py-1.5 hover:bg-slate-800/60 transition-colors duration-200">
+          <span className="text-sm text-slate-200">{t.business_name}</span>
           <div className="flex flex-col items-end gap-1">
             {t.warnings.map((w, i) => (
               <Badge key={i} variant="outline"
@@ -86,6 +91,7 @@ export const TradeWarningsWidget = ({ warnings }) => (
               </Badge>
             ))}
           </div>
+          </Link>
         </li>
       ))}
     </ul>
@@ -97,14 +103,16 @@ export const UpcomingTasksWidget = ({ tasks }) => (
     {tasks.length === 0 && <p className="text-sm text-slate-500" data-testid="upcoming-tasks-empty">Nothing due in the next 7 days.</p>}
     <ul className="space-y-2">
       {tasks.map((t) => (
-        <li key={t.task_id} className="flex items-center justify-between gap-3 text-sm" data-testid={`upcoming-task-${t.task_id}`}>
-          <div>
-            <Link to={`/projects/${t.project_id}`} className="text-slate-200 hover:text-amber-400 transition-colors duration-200">{t.title}</Link>
-            <span className="text-xs text-slate-500 ml-2">{t.project_name}</span>
-          </div>
-          <span className={`text-xs whitespace-nowrap ${t.is_overdue ? "text-red-400 font-semibold" : "text-slate-400"}`}>
-            {formatDate(t.due_date)}{t.is_overdue && " · OVERDUE"}
-          </span>
+        <li key={t.task_id} data-testid={`upcoming-task-${t.task_id}`}>
+          <Link to={`/projects/${t.project_id}?tab=roadmap`} className="flex items-center justify-between gap-3 text-sm rounded-md -mx-2 px-2 py-1.5 hover:bg-slate-800/60 transition-colors duration-200">
+            <span>
+              <span className="text-slate-200">{t.title}</span>
+              <span className="text-xs text-slate-500 ml-2">{t.project_name}</span>
+            </span>
+            <span className={`text-xs whitespace-nowrap ${t.is_overdue ? "text-red-400 font-semibold" : "text-slate-400"}`}>
+              {formatDate(t.due_date)}{t.is_overdue && " · OVERDUE"}
+            </span>
+          </Link>
         </li>
       ))}
     </ul>
@@ -117,8 +125,9 @@ export const ClaimsSnapshotWidget = ({ snapshot }) => (
     <ul className="space-y-4">
       {snapshot.map((c) => (
         <li key={c.project_id} data-testid={`claims-snapshot-${c.project_id}`}>
+          <Link to={`/projects/${c.project_id}?tab=budget`} className="block rounded-md -mx-2 px-2 py-1.5 hover:bg-slate-800/60 transition-colors duration-200">
           <div className="flex items-center justify-between gap-3">
-            <Link to={`/projects/${c.project_id}`} className="text-sm text-slate-200 hover:text-amber-400 transition-colors duration-200">{c.project_name}</Link>
+            <span className="text-sm text-slate-200">{c.project_name}</span>
             {c.next_unclaimed ? (
               <span className="text-xs text-amber-300 whitespace-nowrap">
                 Next: {c.next_unclaimed.stage_label} — {formatMoney(c.next_unclaimed.amount)}
@@ -130,6 +139,7 @@ export const ClaimsSnapshotWidget = ({ snapshot }) => (
           <p className="text-xs text-slate-500 mt-1">
             Claimed {formatMoney(c.total_claimed)} · Paid {formatMoney(c.total_paid)} of {formatAUD(c.contract_value)}
           </p>
+          </Link>
         </li>
       ))}
     </ul>

@@ -47,6 +47,8 @@ class PackageInput(BaseModel):
     status: str = "draft"
     source: str = "manual"
     plan_id: Optional[str] = None
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
 
 
 class PackageUpdate(BaseModel):
@@ -56,6 +58,8 @@ class PackageUpdate(BaseModel):
     scope: Optional[str] = None
     status: Optional[str] = None
     sort_order: Optional[int] = None
+    scheduled_start: Optional[str] = None
+    scheduled_end: Optional[str] = None
 
 
 def validate_package_fields(trade_type: Optional[str], stage_key: Optional[str], status: Optional[str]):

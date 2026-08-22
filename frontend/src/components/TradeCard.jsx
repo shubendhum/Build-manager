@@ -26,8 +26,16 @@ const Stars = ({ rating }) => {
   );
 };
 
-export const TradeCard = ({ trade, actions }) => (
-  <article className="rounded-md border border-slate-700 bg-card p-5" data-testid={`trade-card-${trade.id}`}>
+export const TradeCard = ({ trade, actions, onOpen }) => (
+  <article
+    onClick={onOpen ? () => onOpen(trade) : undefined}
+    onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(trade); } } : undefined}
+    role={onOpen ? "button" : undefined}
+    tabIndex={onOpen ? 0 : undefined}
+    className={`rounded-md border border-slate-700 bg-card p-5 transition-colors duration-200 ${
+      onOpen ? "cursor-pointer hover:border-amber-500/50 focus:outline-none focus:ring-2 focus:ring-amber-500" : ""
+    }`}
+    data-testid={`trade-card-${trade.id}`}>
     <div className="flex items-start justify-between gap-3">
       <div>
         <h3 className="font-heading font-bold text-slate-100 leading-tight">{trade.business_name}</h3>
