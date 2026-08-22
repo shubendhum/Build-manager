@@ -256,12 +256,14 @@ const ScopeCard = ({ plan, onSaved }) => {
 const DraftReview = ({ plan, draft, onApplied }) => {
   const [taskInc, setTaskInc] = useState({});
   const [tradeInc, setTradeInc] = useState({});
+  const [pkgInc, setPkgInc] = useState({});
   const [lines, setLines] = useState([]);
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     setTaskInc(Object.fromEntries(draft.tasks.map((_, i) => [i, true])));
     setTradeInc(Object.fromEntries(draft.trade_types.map((t) => [t, true])));
+    setPkgInc(Object.fromEntries((draft.packages || []).map((p) => [p.title, true])));
     setLines(draft.estimate_lines.map((l) => ({ ...l, include: true, qtyStr: String(l.quantity), rateStr: String(l.rate) })));
   }, [draft]);
 
@@ -271,6 +273,8 @@ const DraftReview = ({ plan, draft, onApplied }) => {
   const subtotal = includedLines.reduce((s, l) => s + (parseFloat(l.qtyStr) || 0) * (parseFloat(l.rateStr) || 0), 0);
   const gst = subtotal * 0.1;
   const taskCount = Object.values(taskInc).filter(Boolean).length;
+  const packages = draft.packages || [];
+  const includedPackages = packages.filter((p) => pkgInc[p.title]);
   const tradeCount = Object.values(tradeInc).filter(Boolean).length;
 
   const tasksByStage = ROADMAP_STAGES
@@ -287,9 +291,14 @@ const DraftReview = ({ plan, draft, onApplied }) => {
         draft_id: draft.id,
         tasks: draft.tasks.filter((_, i) => taskInc[i]).map((t) => ({ stage_key: t.stage_key, name: t.name, description: t.description })),
         trade_types: draft.trade_types.filter((t) => tradeInc[t]),
+        packages: includedPackages.map((p) => ({
+          title: p.title, trade_type: p.trade_type, stage_key: p.stage_key, scope: p.scope,
+        })),
         estimate_lines: includedLines.map((l) => ({
           description: l.description,
           stage_key: l.stage_key,
+          // Only keep the link if that package is actually being created.
+          package_title: pkgInc[l.package_title] ? l.package_title : null,
           quantity: parseFloat(l.qtyStr) || 0,
           unit: l.unit,
           rate: parseFloat(l.rateStr) || 0,
@@ -298,7 +307,9 @@ const DraftReview = ({ plan, draft, onApplied }) => {
         })),
       };
       const { data } = await api.post(`/plans/${plan.id}/apply`, payload, { timeout: 60000 });
-      toast.success(`Applied — ${data.tasks_created} task(s) and ${data.estimate_lines_created} estimate line(s) added to the project.`);
+      toast.success(
+        `Applied — ${data.packages_created || 0} trade package(s), ${data.tasks_created} task(s) ` +
+        `and ${data.estimate_lines_created} estimate line(s) added.`);
       onApplied();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to apply the build plan.");
@@ -339,6 +350,38 @@ const DraftReview = ({ plan, draft, onApplied }) => {
           </div>
         ))}
       </div>
+
+      {/* Trade packages — these become the rows on the Work board */}
+      {packages.length > 0 && (
+        <>
+          <h4 className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-1">
+            Trade packages ({includedPackages.length} selected)
+          </h4>
+          <p className="text-xs text-slate-500 mb-3">
+            Each becomes a row on the Work board that you can send out for quotes. The scope text is what
+            the tradie receives.
+          </p>
+          <div className="space-y-2 mb-6" data-testid="draft-packages">
+            {packages.map((p) => (
+              <label key={p.title} data-testid={`draft-package-${p.title.replace(/\s+/g, "-").toLowerCase()}`}
+                className={`flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${
+                  pkgInc[p.title] ? "border-amber-500/50 bg-amber-500/5" : "border-slate-700 bg-slate-800/40"
+                }`}>
+                <Checkbox className="mt-0.5" checked={!!pkgInc[p.title]}
+                  onCheckedChange={(v) => setPkgInc((m) => ({ ...m, [p.title]: !!v }))} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-slate-100">{p.title}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-amber-400">{tradeTypeLabel(p.trade_type)}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500">{roadmapStageLabel(p.stage_key)}</span>
+                  </span>
+                  {p.scope && <span className="block text-xs text-slate-400 mt-1 line-clamp-3">{p.scope}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Trades checklist */}
       {draft.trade_types.length > 0 && (

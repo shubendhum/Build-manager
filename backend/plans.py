@@ -213,9 +213,18 @@ DRAFT_PROMPT = (
     '- "tasks": array of 3-8 objects per relevant stage: {{"stage_key": "...", "name": "short task title", '
     '"description": "1 sentence of build-specific detail"}}.\n'
     '- "trade_types": array of trade categories (from the allowed list) this build requires.\n'
+    '- "packages": array of 6-14 objects. A package is ONE scope of work you would send to a single '
+    'trade to price — e.g. "Plumbing — rough-in & fit-off", "Roof & gutters", "Electrical". '
+    '{{"title": "short package name", "trade_type": "one of the allowed categories", "stage_key": "...", '
+    '"scope": "2-4 sentences describing exactly what is included and excluded"}}. '
+    "The scope text is sent verbatim to the trade as a request for quote, so write it to them: "
+    "specific about materials, quantities and what they are responsible for. "
+    "Cover the whole build with as few overlapping packages as possible.\n"
     '- "estimate_lines": array of 10-25 objects covering the major cost packages: '
-    '{{"description": "...", "stage_key": "...", "quantity": number, "unit": "m²/m³/item/etc", '
+    '{{"description": "...", "stage_key": "...", "package": "exact title from packages above, or null", '
+    '"quantity": number, "unit": "m²/m³/item/etc", '
     '"rate": number (AUD ex-GST), "rate_ref": "exact work_item name from the rate guide you based the rate on, or null"}}.\n'
+    "Every estimate line should name the package it belongs to so costs roll up per trade. "
     "Quantities must follow from the scope (floor area, storeys, bathrooms…). Where no rate guide item fits, "
     "estimate a realistic 2025 western-Victoria rate and set rate_ref to null."
 )
@@ -275,6 +284,26 @@ def clean_draft(data: dict, rates: list) -> dict:
 
     trade_types = [str(t).strip() for t in (data.get("trade_types") or []) if str(t).strip() in TRADE_TYPES]
 
+    packages, seen_titles = [], set()
+    for p in data.get("packages") or []:
+        title = str(p.get("title") or "").strip()
+        if not title or title.lower() in seen_titles:
+            continue
+        stage_key = str(p.get("stage_key") or "").strip()
+        if stage_key not in STAGE_KEYS:
+            continue
+        trade_type = str(p.get("trade_type") or "").strip()
+        seen_titles.add(title.lower())
+        packages.append({
+            "title": title[:120],
+            "trade_type": trade_type if trade_type in TRADE_TYPES else "other",
+            "stage_key": stage_key,
+            # Sent verbatim to the trade, so keep it whole rather than truncating mid-sentence.
+            "scope": str(p.get("scope") or "").strip()[:1500],
+        })
+    packages.sort(key=lambda p: stage_order.get(p["stage_key"], 99))
+    package_by_title = {p["title"].lower(): p["title"] for p in packages}
+
     lines = []
     for l in data.get("estimate_lines") or []:
         description = str(l.get("description") or "").strip()
@@ -287,9 +316,12 @@ def clean_draft(data: dict, rates: list) -> dict:
             continue
         rate_ref = str(l.get("rate_ref") or "").strip()
         matched = rate_by_name.get(rate_ref.lower()) if rate_ref else None
+        # Only bind to a package that survived validation, or the link dangles.
+        package_ref = str(l.get("package") or "").strip()
         lines.append({
             "description": description[:200],
             "stage_key": stage_key,
+            "package_title": package_by_title.get(package_ref.lower()),
             "quantity": round(quantity, 2),
             "unit": str(l.get("unit") or "").strip()[:30],
             "rate": round(rate, 2),
@@ -298,7 +330,8 @@ def clean_draft(data: dict, rates: list) -> dict:
             "ai_suggested": matched is None,
         })
 
-    return {"tasks": tasks, "trade_types": sorted(set(trade_types)), "estimate_lines": lines}
+    return {"tasks": tasks, "trade_types": sorted(set(trade_types)),
+            "packages": packages, "estimate_lines": lines}
 
 
 # ---------- Routes ----------
@@ -412,7 +445,7 @@ async def generate_draft(plan_id: str):
         raw_reply = await vision_chat([
             {"role": "system", "content": DRAFT_SYSTEM},
             {"role": "user", "content": prompt},
-        ], max_tokens=6000, timeout=300.0)
+        ], max_tokens=9000, timeout=420.0)
         draft_data = clean_draft(extract_json(raw_reply), rates)
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=f"AI draft generation failed: {str(e)[:200]}")
@@ -522,10 +555,10 @@ async def apply_draft(plan_id: str, data: ApplyInput):
 
     # Work packages — created first so estimate lines can be stamped with package_id
     package_ids_by_title = {}
+    pkg_docs = []
     if data.packages:
         last_pkg = await db.work_packages.find({"project_id": project_id}).sort("sort_order", -1).to_list(1)
         pkg_sort = (last_pkg[0]["sort_order"] + 10) if last_pkg else 0
-        pkg_docs = []
         for pkg in data.packages:
             title = pkg.title.strip()
             if not title or title in package_ids_by_title:
@@ -595,6 +628,7 @@ async def apply_draft(plan_id: str, data: ApplyInput):
 
     return {
         "message": "Build plan applied to project.",
+        "packages_created": len(pkg_docs) if data.packages else 0,
         "tasks_created": len(task_docs),
         "estimate_lines_created": len(line_docs),
         "trade_types": data.trade_types,
