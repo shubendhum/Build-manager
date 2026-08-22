@@ -135,12 +135,12 @@ export default function ProjectDetailPage() {
     <main className="max-w-7xl mx-auto px-6 py-8" data-testid="project-detail-page">
       {/* Compact header — the work should be visible without scrolling. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
           <button data-testid="back-to-projects" onClick={() => navigate("/projects")}
             className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-amber-400 transition-colors duration-200 shrink-0">
             <ArrowLeft className="h-4 w-4" aria-hidden="true" /> All jobs
           </button>
-          <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-100 truncate" data-testid="project-title">
+          <h1 className="font-heading text-2xl font-bold tracking-tight text-slate-100" data-testid="project-title">
             {project.name}
           </h1>
           <Badge variant="outline" className={`uppercase tracking-wider text-[10px] shrink-0 ${STATUS_STYLES[project.status]}`}

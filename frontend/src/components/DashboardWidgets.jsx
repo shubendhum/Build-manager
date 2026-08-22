@@ -153,18 +153,19 @@ export const PortfolioList = ({ portfolio }) => (
       <Link key={p.id} to={`/projects/${p.id}`} data-testid={`portfolio-project-${p.id}`}
         className="block rounded-md border border-slate-700 bg-card px-5 py-4 hover:border-amber-500/50 transition-colors duration-200">
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-heading font-semibold text-slate-100">{p.name}</p>
+          <div className="flex-1 min-w-full sm:min-w-[280px]">
+            {/* The job name gets its own line — it is the whole point of the row. */}
+            <p className="font-heading font-semibold text-slate-100 text-base leading-snug break-words">{p.name}</p>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <Badge variant="outline" className={`uppercase tracking-wider text-[9px] ${STATUS_STYLES[p.status]}`}>{statusLabel(p.status)}</Badge>
               <Badge variant="outline" className={`uppercase tracking-wider text-[9px] ${HEALTH_STYLES[p.budget_health]}`}
                 data-testid={`portfolio-health-${p.id}`}>
                 {HEALTH_LABELS[p.budget_health]}
               </Badge>
+              <span className="text-xs text-slate-500">{p.site_suburb} VIC {p.site_postcode} · {formatAUD(p.contract_value)}</span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{p.site_suburb} VIC {p.site_postcode} · {formatAUD(p.contract_value)}</p>
           </div>
-          <div className="flex items-center gap-3 w-56">
+          <div className="flex items-center gap-3 w-full sm:w-56 shrink-0">
             <Progress value={p.progress} className="h-2 bg-slate-700" />
             <span className="text-sm font-heading font-bold text-amber-400 w-12 text-right">{p.progress}%</span>
           </div>
