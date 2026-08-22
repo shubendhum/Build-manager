@@ -137,8 +137,8 @@ const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onUploaded
 const InvitationRow = ({ invitation, onResend, resending }) => (
   <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-slate-900/30" data-testid={`invitation-row-${invitation.id}`}>
     <div className="min-w-0 flex-1">
-      <p className="text-xs font-medium text-slate-300 truncate">{invitation.trade_name || "Unknown trade"}</p>
-      <p className="text-[11px] text-slate-500 truncate">
+      <p className="text-xs font-medium text-slate-300 break-words">{invitation.trade_name || "Unknown trade"}</p>
+      <p className="text-[11px] text-slate-500 break-words">
         {invitation.trade_email || invitation.trade_phone || "no contact on file"}
         {invitation.sent_at && <> · sent {formatDateTime(invitation.sent_at)}</>}
         {invitation.first_viewed_at && (
@@ -185,10 +185,10 @@ const RfqCard = ({ rfq, onClose, onResend, resendingId }) => {
               <ChevronDown className={`h-4 w-4 text-amber-400 shrink-0 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
                 aria-hidden="true" />
               <span className="min-w-0">
-                <span className="block text-sm font-medium text-slate-200 truncate">
+                <span className="block text-sm font-medium text-slate-200 break-words">
                   {rfq.package_title || rfq.scope.split("\n")[0]}
                 </span>
-                <span className="block text-xs text-slate-500 truncate">
+                <span className="block text-xs text-slate-500 break-words">
                   {rfq.submitted_count}/{rfq.invited_count} responded
                   {rfq.due_date && <> · due {formatDate(rfq.due_date)}</>}
                   {rfq.document_ids?.length > 0 && <> · {rfq.document_ids.length} document{rfq.document_ids.length === 1 ? "" : "s"}</>}

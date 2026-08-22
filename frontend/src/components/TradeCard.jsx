@@ -53,7 +53,7 @@ export const TradeCard = ({ trade, actions, onOpen }) => (
 
     <div className="mt-4 space-y-1.5 text-xs text-slate-400">
       {trade.phone && <p className="flex items-center gap-1.5"><Phone className="h-3 w-3 text-amber-400" aria-hidden="true" />{trade.phone}</p>}
-      {trade.email && <p className="flex items-center gap-1.5 truncate"><Mail className="h-3 w-3 text-amber-400" aria-hidden="true" />{trade.email}</p>}
+      {trade.email && <p className="flex items-center gap-1.5 break-all"><Mail className="h-3 w-3 text-amber-400" aria-hidden="true" />{trade.email}</p>}
       {trade.licence_number && (
         <p className="flex items-center gap-1.5">
           <BadgeCheck className="h-3 w-3 text-amber-400" aria-hidden="true" />

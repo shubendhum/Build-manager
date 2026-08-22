@@ -57,13 +57,13 @@ const PackageRow = ({ pkg, onRequest, onEdit, onDelete }) => {
     <div className="flex flex-wrap items-center gap-3 px-4 py-3.5" data-testid={`package-row-${pkg.id}`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-slate-200 truncate">{pkg.title}</p>
+          <p className="text-sm font-medium text-slate-200 break-words">{pkg.title}</p>
           <Badge variant="outline" className={`uppercase tracking-wider text-[10px] shrink-0 ${PACKAGE_STATUS_STYLES[pkg.status]}`}
             data-testid={`package-status-${pkg.id}`}>
             {packageStatusLabel(pkg.status)}
           </Badge>
         </div>
-        <p className="text-xs text-slate-500 truncate mt-0.5">
+        <p className="text-xs text-slate-500 break-words mt-0.5">
           {tradeTypeLabel(pkg.trade_type)} · {roadmapStageLabel(pkg.stage_key)}
           {pkg.invited_count > 0 && <> · {pkg.responded_count}/{pkg.invited_count} responded</>}
           {pkg.quote_count > 0 && <> · {pkg.quote_count} quote{pkg.quote_count === 1 ? "" : "s"}</>}

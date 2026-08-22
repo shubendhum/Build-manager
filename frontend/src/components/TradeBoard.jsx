@@ -59,57 +59,119 @@ const Row = ({ row, expanded, onToggle, onAction, detail }) => {
   const s = STATE[row.state] || STATE["not-engaged"];
   return (
     <div className="border-b border-slate-800 last:border-b-0" data-testid={`board-row-${row.package_id}`}>
-      {/* The whole row is the click target — not just a word in it. */}
-      <div className="flex flex-wrap md:flex-nowrap items-center gap-3 px-4 py-3 hover:bg-slate-800/40 transition-colors duration-200">
-        <button type="button" onClick={onToggle} data-testid={`board-expand-${row.package_id}`}
-          className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
-          <ChevronDown className={`h-4 w-4 text-slate-500 shrink-0 transition-transform duration-200 ${expanded ? "" : "-rotate-90"}`}
-            aria-hidden="true" />
-          <span className={`h-2 w-2 rounded-full shrink-0 ${s.dot}`} aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium text-slate-100 truncate">{row.title}</span>
-            <span className="block text-xs text-slate-500 truncate">
-              {row.trade_name || tradeTypeLabel(row.trade_type)}
-              {row.state === "chasing" && ` · ${row.replied}/${row.invited} replied`}
-              {row.state === "decide" && ` · ${row.live_quote_count} quote${row.live_quote_count === 1 ? "" : "s"} in`}
-              {row.state === "chasing" && row.days_since_sent >= 3 && ` · ${row.days_since_sent}d ago`}
+      {/* Two layouts. Below lg this is a stacked card, because a 900px-wide
+          table on a phone shows about a third of a row and clips every name —
+          and this is the screen a builder opens while standing on site. */}
+      <div className="hover:bg-slate-800/40 transition-colors duration-200">
+
+        {/* ---- phone / tablet ---- */}
+        <div className="lg:hidden px-4 py-3">
+          <button type="button" onClick={onToggle} data-testid={`board-expand-${row.package_id}`}
+            className="w-full text-left">
+            <span className="flex items-start gap-2.5">
+              <ChevronDown className={`h-4 w-4 text-slate-500 shrink-0 mt-1 transition-transform duration-200 ${expanded ? "" : "-rotate-90"}`}
+                aria-hidden="true" />
+              <span className={`h-2 w-2 rounded-full shrink-0 mt-2 ${s.dot}`} aria-hidden="true" />
+              <span className="min-w-0 flex-1">
+                {/* Full name, wrapped — never cut. */}
+                <span className="block text-[15px] font-semibold text-slate-100 leading-snug break-words">{row.title}</span>
+                <span className="block text-xs text-slate-400 mt-0.5 break-words">
+                  {row.trade_name || tradeTypeLabel(row.trade_type)}
+                </span>
+              </span>
+              <span className={`text-xs font-medium shrink-0 ${s.tone}`} data-testid={`board-state-${row.package_id}`}>
+                {s.label}
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
 
-        <span className={`text-xs font-medium shrink-0 w-32 ${s.tone}`} data-testid={`board-state-${row.package_id}`}>
-          {s.label}
-        </span>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3 text-xs">
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">Price</dt>
+              <dd>{row.awarded_amount ? <Money v={row.awarded_amount} className="text-slate-100 font-medium" />
+                : row.best_quote ? <Money v={row.best_quote} className="text-amber-400" />
+                  : <span className="text-slate-600">—</span>}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">On site</dt>
+              <dd className="text-slate-300 text-right">
+                {row.scheduled_start
+                  ? <>{formatDate(row.scheduled_start)}{row.scheduled_end && <> – {formatDate(row.scheduled_end)}</>}</>
+                  : <span className="text-slate-600">—</span>}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">Invoiced</dt>
+              <dd><Money v={row.invoiced} className="text-slate-300" /></dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">Paid</dt>
+              <dd>
+                <Money v={row.paid} className="text-emerald-400" />
+                {row.overdue_count > 0 && <AlertTriangle className="h-3.5 w-3.5 text-red-400 inline ml-1" aria-hidden="true" />}
+              </dd>
+            </div>
+          </dl>
 
-        <span className="text-sm shrink-0 w-28 text-right">
-          {row.awarded_amount ? <Money v={row.awarded_amount} className="text-slate-100 font-medium" />
-            : row.best_quote ? <Money v={row.best_quote} className="text-amber-400" />
-              : <span className="text-slate-600">—</span>}
-        </span>
-
-        <span className="text-xs shrink-0 w-28 text-right text-slate-400">
-          {row.scheduled_start
-            ? <>{formatDate(row.scheduled_start)}{row.scheduled_end && ` – ${formatDate(row.scheduled_end)}`}</>
-            : <span className="text-slate-600">—</span>}
-        </span>
-
-        <span className="text-sm shrink-0 w-24 text-right"><Money v={row.invoiced} className="text-slate-300" /></span>
-        <span className="text-sm shrink-0 w-24 text-right">
-          <Money v={row.paid} className="text-emerald-400" />
-          {row.overdue_count > 0 && (
-            <AlertTriangle className="h-3.5 w-3.5 text-red-400 inline ml-1" aria-hidden="true" />
-          )}
-        </span>
-
-        <span className="shrink-0 w-40 flex justify-end">
           {row.next_action && (
-            <Button size="sm" data-testid={`board-action-${row.package_id}`}
+            <Button size="sm" data-testid={`board-action-m-${row.package_id}`}
               onClick={() => onAction(row, row.next_action.id)}
-              className="bg-amber-500 text-slate-950 text-xs h-8 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
+              className="w-full mt-3 bg-amber-500 text-slate-950 text-xs h-9 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
               {row.next_action.label}
             </Button>
           )}
-        </span>
+        </div>
+
+        {/* ---- desktop table row ---- */}
+        <div className="hidden lg:flex items-center gap-3 px-4 py-3">
+          <button type="button" onClick={onToggle} data-testid={`board-expand-lg-${row.package_id}`}
+            className="flex items-center gap-2.5 min-w-0 flex-1 text-left">
+            <ChevronDown className={`h-4 w-4 text-slate-500 shrink-0 transition-transform duration-200 ${expanded ? "" : "-rotate-90"}`}
+              aria-hidden="true" />
+            <span className={`h-2 w-2 rounded-full shrink-0 ${s.dot}`} aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-slate-100 break-words">{row.title}</span>
+              <span className="block text-xs text-slate-500 break-words">
+                {row.trade_name || tradeTypeLabel(row.trade_type)}
+                {row.state === "chasing" && ` · ${row.replied}/${row.invited} replied`}
+                {row.state === "decide" && ` · ${row.live_quote_count} quote${row.live_quote_count === 1 ? "" : "s"} in`}
+                {row.state === "chasing" && row.days_since_sent >= 3 && ` · ${row.days_since_sent}d ago`}
+              </span>
+            </span>
+          </button>
+
+          <span className={`text-xs font-medium shrink-0 w-28 ${s.tone}`}>{s.label}</span>
+
+          <span className="text-sm shrink-0 w-28 text-right">
+            {row.awarded_amount ? <Money v={row.awarded_amount} className="text-slate-100 font-medium" />
+              : row.best_quote ? <Money v={row.best_quote} className="text-amber-400" />
+                : <span className="text-slate-600">—</span>}
+          </span>
+
+          <span className="text-xs shrink-0 w-28 text-right text-slate-400">
+            {row.scheduled_start
+              ? <>{formatDate(row.scheduled_start)}{row.scheduled_end && ` – ${formatDate(row.scheduled_end)}`}</>
+              : <span className="text-slate-600">—</span>}
+          </span>
+
+          <span className="text-sm shrink-0 w-24 text-right"><Money v={row.invoiced} className="text-slate-300" /></span>
+          <span className="text-sm shrink-0 w-24 text-right">
+            <Money v={row.paid} className="text-emerald-400" />
+            {row.overdue_count > 0 && (
+              <AlertTriangle className="h-3.5 w-3.5 text-red-400 inline ml-1" aria-hidden="true" />
+            )}
+          </span>
+
+          <span className="shrink-0 w-40 flex justify-end">
+            {row.next_action && (
+              <Button size="sm" data-testid={`board-action-${row.package_id}`}
+                onClick={() => onAction(row, row.next_action.id)}
+                className="bg-amber-500 text-slate-950 text-xs h-8 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
+                {row.next_action.label}
+              </Button>
+            )}
+          </span>
+        </div>
       </div>
 
       {expanded && <div className="bg-slate-900/40 border-t border-slate-800 px-4 py-4">{detail}</div>}
@@ -157,7 +219,7 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
           <div className="rounded-md border border-slate-700 divide-y divide-slate-800">
             {invitations.map((inv) => (
               <div key={inv.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-                <span className="text-xs text-slate-300 flex-1 min-w-0 truncate">{inv.trade_name}</span>
+                <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{inv.trade_name}</span>
                 <span className="text-[11px] text-slate-500">
                   {inv.status === "submitted" ? "quoted"
                     : inv.first_viewed_at ? "opened"
@@ -181,7 +243,7 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
             {quotes.map((q) => (
               <div key={q.id} className="flex flex-wrap items-center gap-3 px-3 py-2"
                 data-testid={`board-quote-${q.id}`}>
-                <span className="text-xs text-slate-300 flex-1 min-w-0 truncate">{q.trade_name}</span>
+                <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{q.trade_name}</span>
                 {q.lead_time && <span className="text-[11px] text-slate-500">{q.lead_time}</span>}
                 <span className="text-sm font-medium text-slate-100 tabular-nums">{formatMoney(q.total_inc_gst)}</span>
                 {q.status === "accepted" ? (
@@ -228,7 +290,7 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
               <div key={inv.id} className="flex flex-wrap items-center gap-3 px-3 py-2"
                 data-testid={`board-invoice-${inv.id}`}>
                 <FileText className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden="true" />
-                <span className="text-xs text-slate-300 flex-1 min-w-0 truncate">{inv.invoice_number}</span>
+                <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{inv.invoice_number}</span>
                 {inv.is_overdue && (
                   <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/50 uppercase tracking-wider text-[10px]">
                     Overdue
@@ -395,11 +457,11 @@ export const TradeBoard = ({ projectId }) => {
               </p>
             </div>
           ) : (
-            <div className="rounded-md border border-slate-700 bg-card overflow-x-auto">
-              <div className="min-w-[900px]">
-                <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800/60 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-md border border-slate-700 bg-card lg:overflow-x-auto">
+              <div className="lg:min-w-[900px]">
+                <div className="hidden lg:flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800/60 text-[10px] uppercase tracking-[0.18em] text-slate-500">
                   <span className="flex-1">Trade</span>
-                  <span className="w-32 shrink-0">Status</span>
+                  <span className="w-28 shrink-0">Status</span>
                   <span className="w-28 shrink-0 text-right">Price</span>
                   <span className="w-28 shrink-0 text-right">On site</span>
                   <span className="w-24 shrink-0 text-right">Invoiced</span>
