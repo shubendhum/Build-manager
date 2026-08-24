@@ -13,10 +13,7 @@ SCOPE OF WORKS
 {{ scope }}
 {%- if documents %}
 
-ATTACHED TO THIS EMAIL ({{ documents|length }})
-{%- for doc in documents %}
-  - {{ doc.title }} ({{ doc.filename }})
-{%- endfor %}
+Engineering and architectural drawings attached.
 {%- endif %}
 
 HOW TO QUOTE

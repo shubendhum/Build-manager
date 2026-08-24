@@ -52,14 +52,9 @@
                 <div style="white-space:pre-wrap;font-size:14px;line-height:1.6;background:#f5fafb;border:1px solid #dfeaec;border-radius:4px;padding:12px 14px;margin-bottom:20px;">{{ scope }}</div>
 
                 {% if documents %}
-                <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;font-weight:600;">
-                  Attached to this email ({{ documents|length }})
+                <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">
+                  Engineering and architectural drawings attached.
                 </p>
-                <ul style="margin:0 0 20px;padding-left:18px;font-size:14px;line-height:1.7;">
-                  {% for doc in documents %}
-                  <li>{{ doc.title }} <span style="color:#82929c;">({{ doc.filename }})</span></li>
-                  {% endfor %}
-                </ul>
                 {% endif %}
 
                 <div style="background:#f5fafb;border:1px solid #c6d8dc;border-radius:4px;padding:14px 16px;margin-bottom:20px;">
