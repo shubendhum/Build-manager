@@ -238,7 +238,9 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
         "contact_name": sender[:120],
         "contact_phone": "",
         "contact_email": sender[:200],
-        "status": "pending",
+        # A quote with no number is not a price to decide on — keep it out of
+        # the live set so the board does not offer to award $0.
+        "status": "pending" if total else "expired",
         "source": "email",
         # The price was read by a model, so it must be confirmed before it can
         # be trusted as a commitment.
@@ -253,20 +255,29 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
     }
     await db.quotes.insert_one(dict(quote))
 
+    # A reply with no price in it is not a quote — it is a forward, a question or
+    # an acknowledgement. Record it so the builder can read it, but leave the
+    # invitation open so the watcher keeps looking at that thread for a real
+    # price rather than closing the door on it.
+    priced = bool(total)
     await db.rfqs.update_one(
         {"id": rfq["id"], "invitations.id": invitation["id"]},
-        {"$set": {"invitations.$.status": "submitted",
-                  "invitations.$.submitted_at": now_iso(),
-                  "invitations.$.quote_id": quote_id,
-                  "updated_at": now_iso()}},
+        {"$set": {
+            "invitations.$.status": "submitted" if priced else invitation.get("status", "sent"),
+            "invitations.$.submitted_at": now_iso() if priced else None,
+            "invitations.$.quote_id": quote_id if priced else None,
+            "invitations.$.last_reply_at": now_iso(),
+            "updated_at": now_iso(),
+        }},
     )
-    if rfq.get("package_id"):
+    if priced and rfq.get("package_id"):
         await db.work_packages.update_one(
             {"id": rfq["package_id"], "status": {"$in": ["draft", "out-for-quote"]}},
             {"$set": {"status": "quotes-in", "updated_at": now_iso()}},
         )
     return {"quote_id": quote_id, "trade_id": invitation["trade_id"],
-            "total_inc_gst": total, "had_attachment": attachment_doc is not None}
+            "total_inc_gst": total, "priced": priced,
+            "had_attachment": attachment_doc is not None}
 
 
 @integrations_router.post("/integrations/gmail/poll")

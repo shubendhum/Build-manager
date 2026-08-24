@@ -124,13 +124,53 @@ async def update_quote(quote_id: str, data: QuoteUpdate):
 
 @quotes_router.delete("/quotes/{quote_id}")
 async def delete_quote(quote_id: str):
+    """Delete a quote and, if it came from a quote request, start watching again.
+
+    A reply read out of the mailbox can turn out not to be a quote at all — a
+    forward, an acknowledgement, a question. Deleting it has to reopen the
+    invitation, or the reply watcher skips that thread forever and a real price
+    arriving later is never picked up.
+    """
     quote = await db.quotes.find_one({"id": quote_id})
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found.")
     if quote.get("attachment") and quote["attachment"].get("file_path"):
         Path(quote["attachment"]["file_path"]).unlink(missing_ok=True)
     await db.quotes.delete_one({"id": quote_id})
-    return {"message": "Quote deleted."}
+
+    reopened = False
+    invitation_id = quote.get("invitation_id")
+    if quote.get("rfq_id") and invitation_id:
+        rfq = await db.rfqs.find_one({"id": quote["rfq_id"]}, {"_id": 0})
+        inv = next((i for i in (rfq or {}).get("invitations", []) if i["id"] == invitation_id), None)
+        if inv:
+            # Back to where they were before the reply landed. The already-seen
+            # message stays logged, so the same email is not read a second time —
+            # only something newer in that thread will be.
+            await db.rfqs.update_one(
+                {"id": quote["rfq_id"], "invitations.id": invitation_id},
+                {"$set": {
+                    "invitations.$.status": "viewed" if inv.get("first_viewed_at") else "sent",
+                    "invitations.$.submitted_at": None,
+                    "invitations.$.quote_id": None,
+                    "updated_at": now_iso(),
+                }},
+            )
+            reopened = True
+
+    # If nothing else is priced, the package goes back to awaiting quotes.
+    package_id = quote.get("package_id")
+    if package_id:
+        still_live = await db.quotes.count_documents(
+            {"package_id": package_id, "status": {"$in": ["pending", "submitted", "accepted"]}})
+        if not still_live:
+            await db.work_packages.update_one(
+                {"id": package_id, "status": "quotes-in"},
+                {"$set": {"status": "out-for-quote", "updated_at": now_iso()}},
+            )
+
+    return {"message": "Quote deleted. Still watching for a reply." if reopened else "Quote deleted.",
+            "reopened": reopened}
 
 
 @quotes_router.post("/quotes/{quote_id}/accept")

@@ -74,7 +74,11 @@ const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onUploaded
 
       <div className="rounded-md bg-slate-800/40 border border-slate-700/70 px-3 py-2 mb-3 text-xs text-slate-300 space-y-0.5">
         <p>Ex-GST: {formatMoney(quote.amount_ex_gst)} · GST: {formatMoney(quote.gst_amount)}</p>
-        <p className="font-heading text-base font-bold text-amber-400">{formatMoney(quote.total_inc_gst)} inc GST</p>
+        {quote.total_inc_gst > 0 ? (
+          <p className="font-heading text-base font-bold text-amber-400">{formatMoney(quote.total_inc_gst)} inc GST</p>
+        ) : (
+          <p className="font-heading text-sm font-bold text-slate-400">No price found in their reply</p>
+        )}
       </div>
 
       <div className="text-xs text-slate-400 space-y-1 mb-3">
@@ -148,8 +152,35 @@ const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onUploaded
           className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 transition-colors duration-200">
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </button>
+        {quote.source === "email" && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline" data-testid={`quote-discard-${quote.id}`}
+                className="border-slate-600 text-slate-400 hover:text-amber-400 text-xs h-8">
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> Not a quote
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-card border-slate-700">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-slate-100">Discard this and keep watching?</AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-400">
+                  Use this when the reply turned out not to be a quote — a forward, a question, or an
+                  acknowledgement. It is removed and {quote.trade_name || "the trade"} goes back to
+                  awaiting a price, so a real quote arriving later in the same email thread still gets
+                  picked up. This exact email will not be read again.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="border-slate-600 text-slate-300">Cancel</AlertDialogCancel>
+                <AlertDialogAction data-testid={`quote-discard-confirm-${quote.id}`} onClick={() => onDelete(quote)}
+                  className="bg-amber-500 text-slate-950 hover:bg-amber-400">Discard &amp; keep watching</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
         <button data-testid={`quote-delete-${quote.id}`} onClick={() => onDelete(quote)}
-          className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200">
+          className="p-1.5 rounded-md text-slate-500 hover:text-red-400 transition-colors duration-200"
+          title="Delete" aria-label="Delete">
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
@@ -362,8 +393,10 @@ export const QuotesTab = ({ projectId }) => {
 
   const remove = async (quote) => {
     try {
-      await api.delete(`/quotes/${quote.id}`);
-      toast.success("Quote deleted");
+      const { data } = await api.delete(`/quotes/${quote.id}`);
+      toast.success(data?.reopened
+        ? `Discarded — still watching for a price from ${quote.trade_name || "them"}`
+        : "Quote deleted");
       fetchData();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to delete quote.");
