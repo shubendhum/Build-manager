@@ -228,7 +228,13 @@ async def disconnect():
 # ---------- sending ----------
 
 def build_mime(to: str, subject: str, html: str, text: str,
-               sender: str, reply_to: Optional[str] = None) -> EmailMessage:
+               sender: str, reply_to: Optional[str] = None,
+               attachments: Optional[list] = None) -> EmailMessage:
+    """A multipart message the tradie can simply reply to, files included.
+
+    Attachments are real MIME parts, so the drawings arrive with the request
+    rather than behind a link the trade has to go and fetch.
+    """
     msg = EmailMessage()
     msg["To"] = to
     msg["From"] = sender
@@ -237,17 +243,28 @@ def build_mime(to: str, subject: str, html: str, text: str,
         msg["Reply-To"] = reply_to
     msg.set_content(text)
     msg.add_alternative(html, subtype="html")
+
+    for att in attachments or []:
+        content = att.get("content")
+        if not content:
+            continue
+        media = att.get("media_type") or "application/octet-stream"
+        maintype, _, subtype = media.partition("/")
+        msg.add_attachment(content, maintype=maintype or "application",
+                           subtype=subtype or "octet-stream",
+                           filename=att.get("filename") or "attachment")
     return msg
 
 
 async def send_message(to: str, subject: str, html: str, text: str,
-                       reply_to: Optional[str] = None) -> dict:
+                       reply_to: Optional[str] = None,
+                       attachments: Optional[list] = None) -> dict:
     """Send as the connected mailbox. Returns Gmail's id and threadId."""
     token = await access_token()
     doc = await get_integration() or {}
     sender = send_as() or doc.get("email_address") or "me"
 
-    msg = build_mime(to, subject, html, text, sender, reply_to)
+    msg = build_mime(to, subject, html, text, sender, reply_to, attachments)
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:

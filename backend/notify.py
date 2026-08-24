@@ -39,6 +39,15 @@ _env = Environment(
     lstrip_blocks=True,
 )
 
+# HTML wants tidy block tags; plain text needs its blank lines left alone,
+# because trim_blocks eats the newline after every {% %} and collapses the
+# spacing between sections.
+_text_env = Environment(
+    loader=FileSystemLoader(str(TEMPLATE_DIR)),
+    autoescape=False,
+    keep_trailing_newline=True,
+)
+
 NOTIFY_TIMEOUT = 20.0
 
 
@@ -85,6 +94,21 @@ def from_email() -> str:
 
 def from_name() -> str:
     return _env_str("NOTIFY_FROM_NAME", "BuildManager VIC")
+
+
+def sender_block() -> dict:
+    """Who the tradie is dealing with. Goes in the signature of every message."""
+    return {
+        "name": _env_str("NOTIFY_SENDER_NAME"),
+        "phone": _env_str("NOTIFY_SENDER_PHONE"),
+        "role": _env_str("NOTIFY_SENDER_ROLE"),
+        "company": _env_str("NOTIFY_SENDER_COMPANY"),
+        "email": _env_str("GMAIL_SEND_AS") or from_email(),
+    }
+
+
+# Gmail rejects a message over 25 MB; stay well clear and report what was left off.
+MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
 
 
 def max_per_send() -> int:
@@ -196,10 +220,11 @@ async def _email_http(to: str, subject: str, html: str, text: str) -> SendResult
     return SendResult(ok=True, provider_message_id=str(body.get("id") or body.get("message_id") or "") or None)
 
 
-async def _email_gmail(to: str, subject: str, html: str, text: str) -> SendResult:
+async def _email_gmail(to: str, subject: str, html: str, text: str,
+                       attachments: Optional[list] = None) -> SendResult:
     """Send from the builder's own connected mailbox via the Gmail API."""
     import gmail  # imported lazily: notify must stay usable without the integration
-    sent = await gmail.send_message(to, subject, html, text)
+    sent = await gmail.send_message(to, subject, html, text, attachments=attachments)
     return SendResult(ok=True, provider_message_id=sent["message_id"], thread_id=sent["thread_id"])
 
 
@@ -246,7 +271,8 @@ SMS_DRIVERS = {"console": _sms_console, "http": _sms_http}
 
 # ---------- public send API ----------
 
-async def send_email(to: str, subject: str, html: str, text: str) -> SendResult:
+async def send_email(to: str, subject: str, html: str, text: str,
+                     attachments: Optional[list] = None) -> SendResult:
     """Never raises — transport problems come back as SendResult(ok=False)."""
     if not to:
         return SendResult(ok=False, error="No email address on file for this trade.")
@@ -260,6 +286,10 @@ async def send_email(to: str, subject: str, html: str, text: str) -> SendResult:
     if driver is None:
         return SendResult(ok=False, error=f"Unknown email driver '{email_driver()}'.")
     try:
+        # Only the Gmail driver carries files today; the others ignore them
+        # rather than failing, so a misconfigured driver still reports cleanly.
+        if attachments and email_driver() == "gmail":
+            return await driver(to, subject, html, text, attachments)
         return await driver(to, subject, html, text)
     except Exception as exc:  # noqa: BLE001 - a bad provider must not 500 the request
         logger.exception("Email send failed for %s", to)
@@ -288,12 +318,13 @@ async def send_sms(to: str, body: str) -> SendResult:
 
 def render_rfq(context: dict) -> dict:
     """Returns the exact subject/html/text/sms that will go out."""
-    subject = _env.get_template("rfq_email_subject.txt").render(**context).strip()
+    context = {**context, "sender": sender_block()}
+    subject = _text_env.get_template("rfq_email_subject.txt").render(**context).strip()
     return {
         "subject": subject,
         "html": _env.get_template("rfq_email.html").render(**context),
-        "text": _env.get_template("rfq_email.txt").render(**context),
-        "sms": " ".join(_env.get_template("rfq_sms.txt").render(**context).split()),
+        "text": _text_env.get_template("rfq_email.txt").render(**context),
+        "sms": " ".join(_text_env.get_template("rfq_sms.txt").render(**context).split()),
     }
 
 

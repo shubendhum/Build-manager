@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ package_title }} — quote request</title>
   </head>
-  <body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#0f172a;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">
+  <body style="margin:0;padding:0;background:#ecf3f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#10212a;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ecf3f5;padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dfeaec;border-radius:6px;">
 
             <tr>
-              <td style="background:#0f172a;padding:18px 24px;border-radius:6px 6px 0 0;">
-                <p style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#fbbf24;font-weight:600;">
+              <td style="background:#0a2e39;padding:18px 24px;border-radius:6px 6px 0 0;">
+                <p style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#34cfd6;font-weight:600;">
                   Quote request
                 </p>
-                <p style="margin:4px 0 0;font-size:19px;font-weight:700;color:#f8fafc;">{{ builder_name }}</p>
+                <p style="margin:4px 0 0;font-size:19px;font-weight:700;color:#ecf3f5;">{{ builder_name }}</p>
               </td>
             </tr>
 
@@ -27,68 +27,76 @@
                   {{ builder_name }} is requesting a quote for the works below.
                 </p>
 
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:4px;margin-bottom:20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dfeaec;border-radius:4px;margin-bottom:20px;">
                   <tr>
-                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;width:96px;">Project</td>
+                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;width:96px;">Project</td>
                     <td style="padding:6px 14px;font-size:14px;font-weight:600;">{{ project_name }}</td>
                   </tr>
                   <tr>
-                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;">Site</td>
+                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;">Site</td>
                     <td style="padding:6px 14px;font-size:14px;">{{ site_address }}</td>
                   </tr>
                   <tr>
-                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;">Package</td>
+                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;">Package</td>
                     <td style="padding:6px 14px;font-size:14px;">{{ package_title }}</td>
                   </tr>
                   {% if due_date %}
                   <tr>
-                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;">Quote due</td>
-                    <td style="padding:6px 14px;font-size:14px;font-weight:600;color:#b45309;">{{ due_date }}</td>
+                    <td style="padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;">Quote due</td>
+                    <td style="padding:6px 14px;font-size:14px;font-weight:600;color:#0a8b9c;">{{ due_date }}</td>
                   </tr>
                   {% endif %}
                 </table>
 
-                <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600;">Scope of works</p>
-                <div style="white-space:pre-wrap;font-size:14px;line-height:1.6;background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:12px 14px;margin-bottom:20px;">{{ scope }}</div>
+                <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;font-weight:600;">Scope of works</p>
+                <div style="white-space:pre-wrap;font-size:14px;line-height:1.6;background:#f5fafb;border:1px solid #dfeaec;border-radius:4px;padding:12px 14px;margin-bottom:20px;">{{ scope }}</div>
 
                 {% if documents %}
-                <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600;">
-                  Drawings &amp; documents ({{ documents|length }})
+                <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#82929c;font-weight:600;">
+                  Attached to this email ({{ documents|length }})
                 </p>
                 <ul style="margin:0 0 20px;padding-left:18px;font-size:14px;line-height:1.7;">
                   {% for doc in documents %}
-                  <li>{{ doc.title }} <span style="color:#64748b;">({{ doc.filename }})</span></li>
+                  <li>{{ doc.title }} <span style="color:#82929c;">({{ doc.filename }})</span></li>
                   {% endfor %}
                 </ul>
-                <p style="margin:0 0 20px;font-size:13px;color:#475569;">
-                  Download them from the quote page — no login needed.
-                </p>
                 {% endif %}
 
-                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+                <div style="background:#f5fafb;border:1px solid #c6d8dc;border-radius:4px;padding:14px 16px;margin-bottom:20px;">
+                  <p style="margin:0 0 6px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#0a8b9c;font-weight:600;">
+                    How to quote
+                  </p>
+                  <p style="margin:0;font-size:14px;line-height:1.6;">
+                    Just <strong>reply to this email</strong> with your price. Attach your quote as a PDF if you
+                    have one, and include your lead time and anything you have excluded.
+                  </p>
+                </div>
+
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #dfeaec;">
                   <tr>
-                    <td style="background:#f59e0b;border-radius:4px;">
-                      <a href="{{ portal_url }}" style="display:inline-block;padding:13px 26px;font-size:15px;font-weight:700;color:#0f172a;text-decoration:none;">
-                        Submit your quote
-                      </a>
+                    <td style="padding-top:14px;font-size:14px;line-height:1.55;">
+                      <p style="margin:0 0 8px;color:#4b5c66;">Thanks,</p>
+                      {% if sender.name %}
+                      <p style="margin:0;font-weight:600;">{{ sender.name }}</p>
+                      {% endif %}
+                      {% if sender.role or sender.company %}
+                      <p style="margin:0;font-size:13px;color:#4b5c66;">
+                        {{ sender.role }}{% if sender.role and sender.company %} — {% endif %}{{ sender.company }}
+                      </p>
+                      {% endif %}
+                      {% if sender.phone %}
+                      <p style="margin:6px 0 0;font-size:13px;">
+                        <a href="tel:{{ sender.phone }}" style="color:#0a8b9c;text-decoration:none;">{{ sender.phone }}</a>
+                      </p>
+                      {% endif %}
+                      {% if sender.email %}
+                      <p style="margin:2px 0 0;font-size:13px;">
+                        <a href="mailto:{{ sender.email }}" style="color:#0a8b9c;text-decoration:none;">{{ sender.email }}</a>
+                      </p>
+                      {% endif %}
                     </td>
                   </tr>
                 </table>
-
-                <p style="margin:0 0 4px;font-size:13px;color:#475569;">Or paste this into your browser:</p>
-                <p style="margin:0 0 20px;font-size:12px;word-break:break-all;">
-                  <a href="{{ portal_url }}" style="color:#b45309;">{{ portal_url }}</a>
-                </p>
-
-                <p style="margin:0;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:14px;">
-                  This link is unique to {{ trade_name }} — please don't forward it.
-                </p>
-              </td>
-            </tr>
-
-            <tr>
-              <td style="padding:14px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 6px 6px;">
-                <p style="margin:0;font-size:11px;color:#94a3b8;">Sent by {{ builder_name }} via BuildManager VIC</p>
               </td>
             </tr>
 

@@ -279,6 +279,27 @@ async def send_rfq(rfq_id: str, data: SendInput):
     suburb_line = f"{project.get('site_suburb', '')} VIC {project.get('site_postcode', '')}".strip()
     site_address = ", ".join(p for p in [project.get("site_street") or "", suburb_line] if p.strip())
 
+    # The drawings travel WITH the request as real attachments — a trade should
+    # not have to go and fetch anything to price a job. Read once, reuse for
+    # every recipient. Anything that would push the message over Gmail's limit
+    # is left off and named, rather than silently dropped.
+    attachments, skipped, total = [], [], 0
+    for doc in documents:
+        record = await db.documents.find_one({"id": doc["id"]}, {"_id": 0, "file_path": 1})
+        path = Path((record or {}).get("file_path", ""))
+        if not path.exists():
+            skipped.append(f"{doc['filename']} (missing on disk)")
+            continue
+        raw = path.read_bytes()
+        if total + len(raw) > notify.MAX_ATTACHMENT_BYTES:
+            skipped.append(f"{doc['filename']} (too large to attach)")
+            continue
+        total += len(raw)
+        attachments.append({"filename": doc["filename"], "content": raw,
+                           "media_type": doc.get("media_type") or "application/octet-stream"})
+    attached_docs = [d for d in documents
+                     if any(a["filename"] == d["filename"] for a in attachments)]
+
     results = []
     for inv in targets:
         trade = tmap.get(inv["trade_id"], {})
@@ -291,7 +312,7 @@ async def send_rfq(rfq_id: str, data: SendInput):
             "package_title": package.get("title") or rfq["scope"].splitlines()[0][:60],
             "scope": rfq["scope"],
             "due_date": format_date(rfq.get("due_date")),
-            "documents": documents,
+            "documents": attached_docs,
             "portal_url": f"{base_url}/quote/{inv['token']}",
         }
         rendered = notify.render_rfq(context)
@@ -307,7 +328,8 @@ async def send_rfq(rfq_id: str, data: SendInput):
                 trade_id=inv["trade_id"], channel=channel, to=to, subject=subject, body=body,
             )
             if channel == "email":
-                result = await notify.send_email(to, rendered["subject"], rendered["html"], rendered["text"])
+                result = await notify.send_email(to, rendered["subject"], rendered["html"],
+                                                 rendered["text"], attachments=attachments)
                 email_result = result
             else:
                 result = await notify.send_sms(to, rendered["sms"])
@@ -348,6 +370,8 @@ async def send_rfq(rfq_id: str, data: SendInput):
     return {
         "sent": sum(1 for r in results if r["ok"]),
         "failed": sum(1 for r in results if not r["ok"]),
+        "attached": [a["filename"] for a in attachments],
+        "skipped_attachments": skipped,
         "results": results,
     }
 

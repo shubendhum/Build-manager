@@ -1,24 +1,38 @@
 Hi {{ contact_person or trade_name }},
 
-{{ builder_name }} is requesting a quote for the following works.
+{{ builder_name }} is requesting a quote for the works below.
 
 PROJECT   {{ project_name }}
 SITE      {{ site_address }}
 PACKAGE   {{ package_title }}
-{% if due_date %}QUOTE DUE {{ due_date }}
-{% endif %}
+{%- if due_date %}
+QUOTE DUE {{ due_date }}
+{%- endif %}
+
 SCOPE OF WORKS
 {{ scope }}
-{% if documents %}
-DRAWINGS AND DOCUMENTS ({{ documents|length }})
-{% for doc in documents %}  - {{ doc.title }} ({{ doc.filename }})
-{% endfor %}
-Download them from the link below.
-{% endif %}
-Submit your quote here — no login needed, works on your phone:
-{{ portal_url }}
+{%- if documents %}
 
-This link is unique to {{ trade_name }}. Please don't forward it.
+ATTACHED TO THIS EMAIL ({{ documents|length }})
+{%- for doc in documents %}
+  - {{ doc.title }} ({{ doc.filename }})
+{%- endfor %}
+{%- endif %}
+
+HOW TO QUOTE
+Just reply to this email with your price. Attach your quote as a PDF if you
+have one, and include your lead time and anything you have excluded.
 
 Thanks,
-{{ builder_name }}
+{%- if sender.name %}
+{{ sender.name }}
+{%- endif %}
+{%- if sender.role or sender.company %}
+{{ sender.role }}{% if sender.role and sender.company %} — {% endif %}{{ sender.company }}
+{%- endif %}
+{%- if sender.phone %}
+{{ sender.phone }}
+{%- endif %}
+{%- if sender.email %}
+{{ sender.email }}
+{%- endif %}
