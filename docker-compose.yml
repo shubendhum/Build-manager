@@ -12,6 +12,21 @@ services:
     environment:
       MONGO_INITDB_DATABASE: buildmanager
 
+  # Virus scanning for files that arrive from outside — tradie email
+  # attachments and portal uploads. Local, so nothing is sent to a third party.
+  # Note: clamd holds the signature database in memory (~1.5 GB) and takes a
+  # couple of minutes to become ready on first start.
+  clamav:
+    image: clamav/clamav:latest
+    container_name: buildmanager-clamav
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
   backend:
     build:
       context: ./backend
@@ -28,6 +43,7 @@ services:
       - uploads:/app/backend/uploads
     depends_on:
       - mongo
+      - clamav
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/"]
       interval: 10s

@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from db import db
 from auth import get_current_user
 from roadmap_template import STAGE_KEYS
+import antivirus
 import notify
 
 rfqs_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -493,11 +494,25 @@ async def public_rfq_submit(
             raise HTTPException(status_code=400, detail="Attached file is empty.")
         if len(raw) > MAX_ATTACH_BYTES:
             raise HTTPException(status_code=413, detail="Attachment too large. Maximum size is 10 MB.")
+        # Uploaded by a trade, so scanned before it is stored.
+        verdict = await antivirus.check_incoming(raw, attachment.content_type,
+                                                 attachment.filename or "attachment")
+        if verdict.status == "infected":
+            raise HTTPException(
+                status_code=400,
+                detail="That file was rejected by our virus scan. Please check it and try again, "
+                       "or send your quote by email instead.")
+        if not verdict.safe_to_store:
+            raise HTTPException(
+                status_code=503,
+                detail="We can't accept attachments at the moment. Please submit your price without "
+                       "the file, or email it to us.")
         ext = ATTACH_TYPES[attachment.content_type]
         file_path = QUOTE_UPLOAD_DIR / f"{quote_id}{ext}"
         file_path.write_bytes(raw)
         attach_doc = {"filename": attachment.filename or f"attachment{ext}", "file_path": str(file_path),
-                      "media_type": attachment.content_type}
+                      "media_type": attachment.content_type, "file_size": len(raw),
+                      "scan": verdict.model_dump()}
 
     package = await db.work_packages.find_one({"id": rfq["package_id"]}, {"_id": 0}) or {}
     # Group by the package record, not by parsing the scope text — two trades

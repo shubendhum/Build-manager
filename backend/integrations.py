@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+import antivirus
 import gmail
 import notify
 from db import db
@@ -198,6 +199,7 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
 
     quote_id = str(uuid.uuid4())
     attachment_doc, terms = None, {}
+    rejected_attachment = None
     for att in gmail.attachments_in(payload):
         if att["media_type"] not in READABLE_ATTACHMENTS:
             continue
@@ -206,11 +208,28 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
         except RuntimeError as exc:
             logger.warning("Attachment download failed: %s", exc)
             continue
+        # Scanned BEFORE it touches disk. This file came from a stranger, and
+        # once written the app serves it back to the builder on request.
+        verdict = await antivirus.check_incoming(raw, att["media_type"], att["filename"])
+        if not verdict.safe_to_store:
+            logger.warning("Attachment %s not stored: %s (%s)",
+                           att["filename"], verdict.status, verdict.signature or verdict.detail)
+            rejected_attachment = {
+                "filename": att["filename"], "media_type": att["media_type"],
+                "scan": verdict.model_dump(),
+            }
+            # Read the price from memory anyway — the reply is still evidence,
+            # we just refuse to keep the file.
+            terms = await extract_quote_terms(raw, att["media_type"], body_text) \
+                if verdict.status == "unscanned" else {}
+            break
+
         suffix = Path(att["filename"]).suffix or ".pdf"
         path = QUOTE_UPLOAD_DIR / f"{quote_id}{suffix}"
         path.write_bytes(raw)
         attachment_doc = {"filename": att["filename"], "file_path": str(path),
-                          "media_type": att["media_type"]}
+                          "media_type": att["media_type"], "file_size": len(raw),
+                          "scan": verdict.model_dump()}
         terms = await extract_quote_terms(raw, att["media_type"], body_text)
         break   # the first readable attachment is the quote
 
@@ -250,6 +269,8 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
         "rfq_id": rfq["id"],
         "invitation_id": invitation["id"],
         "attachment": attachment_doc,
+        # Named so the builder knows a file arrived and why it was not kept.
+        "rejected_attachment": rejected_attachment,
         "created_at": now_iso(),
         "updated_at": now_iso(),
     }
