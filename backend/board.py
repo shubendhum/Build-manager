@@ -139,6 +139,8 @@ async def trade_board(project_id: str):
         rows.append({
             "package_id": pkg["id"],
             "title": pkg["title"],
+            # Carried so "Get quotes" can prefill the scope the trade will read.
+            "scope": pkg.get("scope", ""),
             "trade_type": pkg.get("trade_type"),
             "stage_key": pkg.get("stage_key"),
             "sort_order": pkg.get("sort_order", 0),

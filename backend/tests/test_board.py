@@ -178,3 +178,31 @@ class TestTotals:
 
     def test_unknown_project_404(self, session):
         assert session.get(f"{API}/projects/{uuid.uuid4()}/board", timeout=T).status_code == 404
+
+
+class TestRowIsEnoughToActOn:
+    """A board row is what the UI hands straight back to the RFQ endpoint when
+    you press "Get quotes". If the row omits a field that endpoint requires, the
+    button 422s — which is exactly what happened in production."""
+
+    def test_row_carries_everything_the_rfq_endpoint_needs(self, session, project_id):
+        row = board(session, project_id)["rows"][0]
+        for field in ("package_id", "title", "scope", "stage_key", "trade_type"):
+            assert field in row, f"board row is missing {field}"
+        assert row["package_id"], "package_id must be populated, not just present"
+
+    def test_creating_an_rfq_straight_from_a_row_works(self, session, project_id, trades):
+        """Post using only what a row provides — no package lookup in between."""
+        made = session.post(f"{API}/projects/{project_id}/packages", timeout=T, json={
+            "title": "Row-to-RFQ check", "trade_type": "plumber",
+            "stage_key": "lockup", "scope": "Scope carried on the row.",
+        }).json()["id"]
+        row = next(r for r in board(session, project_id)["rows"] if r["package_id"] == made)
+        r = session.post(f"{API}/projects/{project_id}/rfqs", timeout=T, json={
+            "package_id": row["package_id"],
+            "trade_ids": [trades[0]],
+            "scope": row["scope"] or "Scope to follow.",
+            "stage_key": row["stage_key"],
+            "document_ids": [],
+        })
+        assert r.status_code in (200, 201), f"a board row must be sufficient to raise an RFQ: {r.text}"

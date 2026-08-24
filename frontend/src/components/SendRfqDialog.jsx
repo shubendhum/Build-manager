@@ -44,6 +44,10 @@ const ChannelToggle = ({ active, onClick, icon: Icon, label, testId }) => (
 );
 
 export const SendRfqDialog = ({ open, onOpenChange, projectId, pkg, trades, documents, onSaved }) => {
+  // Opened from the Packages tab with a package ({id, scope}) and from the Work
+  // board with a board row ({package_id, no scope}). Normalise both here so the
+  // caller's shape can never drop a required field on the floor again.
+  const packageId = pkg?.id ?? pkg?.package_id ?? null;
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState([]);
   const [emails, setEmails] = useState({});   // trade_id -> email captured inline
@@ -62,7 +66,7 @@ export const SendRfqDialog = ({ open, onOpenChange, projectId, pkg, trades, docu
     setSelected([]);
     setEmails({});
     setPhones({});
-    setScope(pkg?.scope || "");
+    setScope(pkg?.scope ?? "");
     setDueDate("");
     setDocIds(documents.filter((d) => d.category === "drawings").map((d) => d.id));
     setChannels(["email"]);
@@ -106,14 +110,16 @@ export const SendRfqDialog = ({ open, onOpenChange, projectId, pkg, trades, docu
 
   const send = async () => {
     if (!channels.length) { toast.error("Pick at least one way to send this."); return; }
+    if (!packageId) { toast.error("This package could not be identified — reload and try again."); return; }
+    if (!scope.trim()) { toast.error("Add a scope of works before sending."); return; }
     setBusy(true);
     try {
       await saveCapturedContacts();
       const { data: rfq } = await api.post(`/projects/${projectId}/rfqs`, {
-        package_id: pkg.id,
+        package_id: packageId,
         trade_ids: selected,
         scope,
-        stage_key: pkg.stage_key,
+        stage_key: pkg?.stage_key ?? null,
         due_date: dueDate || null,
         document_ids: docIds,
       });
