@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, CheckCircle2, Paperclip, FileText, Copy, XCircle, Globe,
-  ChevronDown, RefreshCw, PackageOpen, Eye, AlertTriangle,
+  ChevronDown, RefreshCw, PackageOpen, Eye, AlertTriangle, Mail, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,18 @@ const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onUploaded
               <Globe className="h-3 w-3 mr-1" aria-hidden="true" /> Submitted via portal
             </Badge>
           )}
+          {quote.source === "email" && (
+            <Badge variant="outline" className="bg-sky-500/15 text-sky-400 border-sky-500/40 uppercase tracking-wider text-[10px]"
+              data-testid={`quote-email-badge-${quote.id}`}>
+              <Mail className="h-3 w-3 mr-1" aria-hidden="true" /> Replied by email
+            </Badge>
+          )}
+          {quote.needs_review && (
+            <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/50 uppercase tracking-wider text-[10px]"
+              data-testid={`quote-review-badge-${quote.id}`}>
+              <AlertTriangle className="h-3 w-3 mr-1" aria-hidden="true" /> Check the price
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -71,6 +83,17 @@ const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onUploaded
         {quote.scope_description && <p className="text-slate-300 line-clamp-3">{quote.scope_description}</p>}
         {quote.exclusions && <p className="text-slate-500 line-clamp-2">Excl: {quote.exclusions}</p>}
         {quote.lead_time && <p>Lead time: {quote.lead_time}</p>}
+        {quote.email_body && (
+          <details className="mt-1" data-testid={`quote-reply-${quote.id}`}>
+            <summary className="cursor-pointer text-sky-400 hover:text-sky-300 transition-colors duration-200">
+              Read their reply
+            </summary>
+            {quote.email_subject && <p className="text-slate-500 mt-1">Subject: {quote.email_subject}</p>}
+            <pre className="mt-1 whitespace-pre-wrap text-[11px] text-slate-400 bg-slate-900/50 rounded-md p-2.5 max-h-56 overflow-y-auto">
+              {quote.email_body}
+            </pre>
+          </details>
+        )}
         {quote.source === "portal" && quote.contact_name && (
           <p className="text-slate-500">
             Contact: {quote.contact_name}
@@ -174,6 +197,52 @@ const InvitationRow = ({ invitation, onResend, resending }) => (
   </div>
 );
 
+const MessageLog = ({ rfqId }) => {
+  const [log, setLog] = useState(null);
+  useEffect(() => {
+    api.get(`/rfqs/${rfqId}/log`).then(({ data }) => setLog(data)).catch(() => setLog([]));
+  }, [rfqId]);
+
+  if (!log) return <p className="px-4 py-2 text-xs text-slate-500">Loading messages…</p>;
+  if (log.length === 0) {
+    return <p className="px-4 py-2 text-xs text-slate-500">Nothing sent yet for this request.</p>;
+  }
+  return (
+    <div data-testid={`message-log-${rfqId}`}>
+      <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+        Messages sent ({log.length})
+      </p>
+      <div className="divide-y divide-slate-800">
+        {log.map((m) => (
+          <details key={m.id} className="px-4 py-2" data-testid={`message-${m.id}`}>
+            <summary className="flex flex-wrap items-center gap-2 cursor-pointer list-none">
+              {m.channel === "email"
+                ? <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden="true" />
+                : <MessageSquare className="h-3.5 w-3.5 text-slate-500 shrink-0" aria-hidden="true" />}
+              <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{m.to || "(no address)"}</span>
+              <Badge variant="outline" className={`uppercase tracking-wider text-[10px] shrink-0 ${
+                m.status === "sent" ? "bg-emerald-600/20 text-emerald-400 border-emerald-600/40"
+                  : "bg-red-500/15 text-red-400 border-red-500/50"}`}>
+                {m.status}
+              </Badge>
+              <span className="text-[11px] text-slate-500 shrink-0">
+                {formatDateTime(m.sent_at || m.created_at)}
+              </span>
+            </summary>
+            {m.error && <p className="text-[11px] text-red-400 mt-1.5">{m.error}</p>}
+            {m.subject && <p className="text-[11px] text-slate-400 mt-1.5">Subject: {m.subject}</p>}
+            {m.body && (
+              <pre className="mt-1.5 whitespace-pre-wrap text-[11px] text-slate-400 bg-slate-900/50 rounded-md p-2.5 max-h-56 overflow-y-auto">
+                {m.body}
+              </pre>
+            )}
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const RfqCard = ({ rfq, onClose, onResend, resendingId }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -213,6 +282,7 @@ const RfqCard = ({ rfq, onClose, onResend, resendingId }) => {
               <InvitationRow key={inv.id} invitation={inv} onResend={(i) => onResend(rfq, i)}
                 resending={resendingId === inv.id} />
             ))}
+            {open && <MessageLog rfqId={rfq.id} />}
           </div>
         </CollapsibleContent>
       </div>
