@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException, Depends, Query, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -295,6 +296,21 @@ app.include_router(dashboard_router)
 app.include_router(documents_router)
 app.include_router(reports_router)
 app.include_router(api_router)
+
+
+# A 422 is invisible in the access log — it only shows the status code, so a
+# malformed request from the browser gives you nothing to debug. Log which
+# fields failed and what was actually sent.
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    fields = [{"loc": list(e.get("loc", [])), "msg": e.get("msg")} for e in exc.errors()]
+    try:
+        body = exc.body if isinstance(exc.body, (dict, list)) else str(exc.body)[:500]
+    except Exception:  # noqa: BLE001
+        body = "<unreadable>"
+    logging.getLogger("validation").warning(
+        "422 %s %s -> %s | body=%s", request.method, request.url.path, fields, body)
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
 @app.on_event("startup")
