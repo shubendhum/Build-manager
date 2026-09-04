@@ -134,7 +134,7 @@ class TestShape:
         assert sum(s["badges"].values()) == counted
 
     def test_every_action_points_at_a_real_tab(self, session, project_id):
-        valid = {"overview", "planner", "packages", "trades", "quotes",
+        valid = {"overview", "planner", "packages", "trades", "quotes", "steps",
                  "roadmap", "diary", "budget", "invoices", "variations", "documents"}
         for a in steps(session, project_id)["actions"]:
             assert a["tab"] in valid, f"{a['id']} points at unknown tab {a['tab']}"

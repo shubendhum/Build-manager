@@ -131,6 +131,15 @@ SEQUENCE = [
      "trades": ["building-surveyor"], "stage_key": "completion", "lead_weeks": 2, "mandatory": True},
 ]
 
+
+# Everything the builder has to DO at each step that is not a trade to quote:
+# permits, mandatory inspections, certificates to collect, notifications, and
+# the site set-up. These are the items with no package behind them, so without
+# listing them they simply do not appear anywhere.
+#
+# The supervisor's own checklist — permits, hold points, certificates — lives in
+# supervisor.py. This module stays about the order the trades come in.
+
 BY_KEY = {s["key"]: s for s in SEQUENCE}
 BY_NUMBER = {s["n"]: s for s in SEQUENCE}
 SEQUENCE_KEYS = set(BY_KEY)

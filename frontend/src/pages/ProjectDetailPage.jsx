@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { NextSteps } from "@/components/NextSteps";
 import { QuickUpload } from "@/components/QuickUpload";
 import { ChatPanel } from "@/components/ChatPanel";
+import { BuildStepsTab } from "@/components/BuildStepsTab";
 import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { PlannerTab } from "@/components/PlannerTab";
@@ -28,6 +29,7 @@ import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 const AREAS = [
   { key: "work", label: "The work", icon: Hammer, children: [
       ["work", "Trade board", "who is doing what, and where each is up to"],
+      ["steps", "My checklist", "permits, hold points, inspections and certificates"],
       ["packages", "Packages", "the scopes you send out for quotes"],
       ["quotes", "Quotes & requests", "prices in, and who you asked"],
       ["trades", "Tradies on this job", "assigned to this job"],
@@ -111,6 +113,7 @@ export default function ProjectDetailPage() {
   };
 
   const content = {
+    steps: <BuildStepsTab projectId={project.id} />,
     work: (
       <>
         {boardSteps?.actions.length > 0 && <NextSteps data={boardSteps} onGo={setLeaf} />}

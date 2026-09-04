@@ -15,6 +15,7 @@ from auth import get_current_user
 from trades import trade_warnings
 from invoices import derive as derive_invoice
 from packages import LIVE_QUOTE_STATUSES, COMMITTED_STATUSES
+from steps import list_steps
 import build_sequence
 
 nextsteps_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -199,6 +200,34 @@ async def next_steps(project_id: str):
             f"{len(overdue_invoices)} invoice{'' if len(overdue_invoices) == 1 else 's'} overdue",
             f"${total:,.2f} outstanding past its due date.", "invoices", len(overdue_invoices)))
 
+    # ---- 7. The supervisor's own checklist ------------------------------
+    # Permits, hold points and certificates have no package behind them, so
+    # without this they are invisible on every screen but their own.
+    checklist = await list_steps(project_id)
+    holds = checklist["hold_points"]
+    if holds:
+        actions.append(_action(
+            "hold-point", "urgent",
+            f"{len(holds)} mandatory hold point{'' if len(holds) == 1 else 's'} — do not proceed",
+            holds[0]["name"], "steps", len(holds)))
+
+    late = [r for r in checklist["reminders"] if r["severity"] == "overdue"]
+    if late:
+        actions.append(_action(
+            "checklist-overdue", "urgent",
+            f"{len(late)} checklist item{'' if len(late) == 1 else 's'} overdue",
+            f"{late[0]['name']} — {late[0]['why']}", "steps", len(late)))
+
+    early = [r for r in checklist["reminders"] if r["severity"] in {"lead-time", "due-soon"}]
+    if early:
+        actions.append(_action(
+            "checklist-lead-time", "decision",
+            f"{len(early)} thing{'' if len(early) == 1 else 's'} to start now, not later",
+            f"{early[0]['name']} — {early[0]['why']}", "steps", len(early)))
+
+    if checklist["items_done"]:
+        done.append(f"{checklist['items_done']} of {checklist['items_total']} checklist items done")
+
     actions.sort(key=lambda a: SEVERITY_RANK.get(a["severity"], 9))
 
     # Tab-level counts drive the attention chips on the grouped navigation.
@@ -222,4 +251,6 @@ async def next_steps(project_id: str):
                                  "of": len(build_sequence.SEQUENCE)}
 
     return {"project_id": project_id, "actions": actions, "done": done, "badges": badges,
-            "current_stage": current_stage}
+            "current_stage": current_stage,
+            "checklist": {"phase": checklist["current_phase_name"],
+                          "done": checklist["items_done"], "total": checklist["items_total"]}}

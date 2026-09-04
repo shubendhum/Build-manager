@@ -30,6 +30,7 @@ from packages import packages_router  # noqa: E402
 from nextsteps import nextsteps_router  # noqa: E402
 from board import board_router  # noqa: E402
 from agent import agent_router  # noqa: E402
+from steps import steps_router  # noqa: E402
 from integrations import integrations_router, public_integrations_router, poll_loop  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
 from variations import variations_router  # noqa: E402
@@ -281,6 +282,7 @@ app.include_router(packages_router)
 app.include_router(nextsteps_router)
 app.include_router(board_router)
 app.include_router(agent_router)
+app.include_router(steps_router)
 app.include_router(integrations_router)
 app.include_router(public_integrations_router)
 app.include_router(rfqs_router)
@@ -325,6 +327,7 @@ async def on_startup():
     await db.rfqs.create_index([("project_id", 1), ("package_id", 1)])
     await db.quotes.create_index([("project_id", 1), ("package_id", 1)])
     await db.notifications.create_index([("rfq_id", 1), ("created_at", -1)])
+    await db.step_actions.create_index([("project_id", 1), ("action_key", 1)], unique=True)
     await ensure_reference_rates()
     await seed_all()
     # Background: pull trade replies out of Gmail without anyone clicking.
