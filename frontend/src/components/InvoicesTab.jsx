@@ -112,7 +112,7 @@ export const InvoicesTab = ({ projectId, contractValue }) => {
       toast.success("Invoice deleted");
       fetchData();
     } catch (e) {
-      toast.error("Failed to delete invoice.");
+      toast.error("Could not delete that invoice.");
     }
   };
 
@@ -122,7 +122,7 @@ export const InvoicesTab = ({ projectId, contractValue }) => {
       toast.success("Payment removed");
       fetchData();
     } catch (e) {
-      toast.error("Failed to remove payment.");
+      toast.error("Could not remove that payment.");
     }
   };
 
@@ -134,20 +134,24 @@ export const InvoicesTab = ({ projectId, contractValue }) => {
   return (
     <div data-testid="invoices-tab">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <SummaryCard label="Total Invoiced" value={formatMoney(summary.total_invoiced)} testId="invoices-summary-total" />
+        <SummaryCard label="Invoiced" value={formatMoney(summary.total_invoiced)} testId="invoices-summary-total" />
         <SummaryCard label="Paid" value={formatMoney(summary.total_paid)} accent="text-emerald-400" testId="invoices-summary-paid" />
         <SummaryCard label="Outstanding" value={formatMoney(summary.outstanding)} accent="text-amber-400" testId="invoices-summary-outstanding" />
         <SummaryCard label="Overdue" value={summary.overdue_count} accent={summary.overdue_count ? "text-red-400" : "text-slate-100"} testId="invoices-summary-overdue" />
       </div>
 
-      <div className="flex justify-end mb-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Invoices</h3>
+          <p className="text-xs text-slate-500 mt-0.5">What your trades have billed, and what is still owing.</p>
+        </div>
         <Button data-testid="add-invoice-button" onClick={() => { setEditing(null); setFormOpen(true); }}
           className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
-          <Plus className="h-4 w-4" aria-hidden="true" /> Add Invoice
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add invoice
         </Button>
       </div>
 
-      {invoices.length === 0 && <p className="text-sm text-slate-500 mb-6" data-testid="invoices-empty">No invoices recorded yet.</p>}
+      {invoices.length === 0 && <p className="text-sm text-slate-500 mb-6" data-testid="invoices-empty">No invoices yet. Add one when a trade bills you, or from their row on the board.</p>}
 
       <div className="space-y-4">
         {invoices.map((inv) => (

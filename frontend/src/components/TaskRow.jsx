@@ -18,7 +18,7 @@ export const TaskRow = ({ task, onChanged }) => {
       await api.put(`/tasks/${task.id}`, { status });
       onChanged();
     } catch (e) {
-      toast.error("Failed to update task status.");
+      toast.error("Could not update that task.");
     }
   };
 
@@ -28,7 +28,7 @@ export const TaskRow = ({ task, onChanged }) => {
       toast.success("Task deleted");
       onChanged();
     } catch (e) {
-      toast.error("Failed to delete task.");
+      toast.error("Could not delete that task.");
     }
   };
 

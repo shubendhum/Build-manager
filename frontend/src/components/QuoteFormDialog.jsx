@@ -78,7 +78,7 @@ export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, 
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save quote.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that quote.");
     } finally {
       setBusy(false);
     }
@@ -88,7 +88,7 @@ export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-slate-700" data-testid="quote-form-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit Quote" : "Add Quote"}</DialogTitle>
+          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit quote" : "Add a price"}</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">Quotes are grouped by work package for comparison.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">

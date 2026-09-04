@@ -14,6 +14,7 @@ import { PackageFormDialog } from "@/components/PackageFormDialog";
 import { QuoteFormDialog } from "@/components/QuoteFormDialog";
 import { QuoteCard } from "@/components/QuoteCard";
 import { RfqPanel } from "@/components/RfqPanel";
+import { TradeGaps } from "@/components/TradeGaps";
 import { SendRfqDialog, copyRfqLink } from "@/components/SendRfqDialog";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { InvoiceFormDialog } from "@/components/InvoiceFormDialog";
@@ -141,7 +142,9 @@ const StageTracker = ({ sequence, current, upcoming, onAction, rows }) => {
 const Row = ({ row, expanded, onToggle, onAction, detail }) => {
   const s = STATE[row.state] || STATE["not-engaged"];
   return (
-    <div className="border-b border-slate-800 last:border-b-0" data-testid={`board-row-${row.package_id}`}>
+    <div id={`row-${row.package_id}`}
+      className={`border-b border-slate-800 last:border-b-0 scroll-mt-24 ${expanded ? "bg-slate-800/20" : ""}`}
+      data-testid={`board-row-${row.package_id}`}>
       {/* Two layouts. Below lg this is a stacked card, because a 900px-wide
           table on a phone shows about a third of a row and clips every name —
           and this is the screen a builder opens while standing on site. */}
@@ -417,7 +420,7 @@ const RowDetail = ({ row, data, onAction, onRefresh, onEditQuote }) => {
   );
 };
 
-export const TradeBoard = ({ projectId }) => {
+export const TradeBoard = ({ projectId, focusPackageId }) => {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
@@ -453,6 +456,19 @@ export const TradeBoard = ({ projectId }) => {
   }, [projectId]);
 
   useEffect(() => { fetchBoard(); }, [fetchBoard]);
+
+  // Arriving from a checklist item opens that row and scrolls to it.
+  useEffect(() => {
+    if (!focusPackageId || !board) return;
+    setExpanded(focusPackageId);
+    const row = board.rows.find((r) => r.package_id === focusPackageId);
+    if (row && !details[focusPackageId]) loadDetail(row);
+    setTimeout(() => document.getElementById(`row-${focusPackageId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    // details is deliberately absent: re-running on every detail load would
+    // yank the page back to this row while you are reading another.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPackageId, board, loadDetail]);
 
   const loadDetail = useCallback(async (row) => {
     const [q, r, i] = await Promise.all([
@@ -534,6 +550,7 @@ export const TradeBoard = ({ projectId }) => {
       {!loading && board && (
         <>
           <SummaryBar totals={board.totals} />
+          <TradeGaps projectId={projectId} onBooked={fetchBoard} />
           <StageTracker sequence={board.sequence} current={board.current_step}
             upcoming={board.needs_pricing_soon} rows={board.rows} onAction={onAction} />
 

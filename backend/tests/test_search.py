@@ -3,6 +3,8 @@ import os
 import pytest
 import requests
 
+from conftest import real_projects
+
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
 CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
@@ -19,7 +21,7 @@ def session():
 @pytest.fixture(scope="module")
 def suburb(session):
     """Search against a job that actually exists rather than the deleted demo."""
-    projects = session.get(f"{API}/projects", timeout=15).json()
+    projects = real_projects(session.get(f"{API}/projects", timeout=15).json())
     if not projects:
         pytest.skip("no job to search for")
     return projects[0]["site_suburb"]

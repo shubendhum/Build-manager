@@ -57,6 +57,32 @@ class ActionUpdate(BaseModel):
     document_id: Optional[str] = None    # the filed evidence
 
 
+def _match_package(entry: dict, packages: list, phase_steps: list) -> Optional[dict]:
+    """Find the board package that covers this piece of trade work.
+
+    Title keywords first, most specific first, and across the whole board rather
+    than this phase's steps — one engagement routinely covers two visits, and the
+    plumber's rough-in and fit-off are normally the same package. Where a keyword
+    hits more than one package, the one sitting in this phase wins: "roof"
+    matches both the frame carpenter's roof structure and the roof plumber, and
+    only the second of those is roofing.
+
+    Trade type is a last resort and never for "other" — that is the catch-all,
+    so matching on it would put the scaffolder against the window supplier.
+    """
+    for keyword in entry["match"]:
+        hits = [p for p in packages if keyword in p["title"].lower()]
+        if not hits:
+            continue
+        return next((p for p in hits if p["step"] in phase_steps), hits[0])
+
+    if entry["type"] == "other":
+        return None
+    same_type = [p for p in packages
+                 if p.get("trade_type") == entry["type"] and p["step"] in phase_steps]
+    return same_type[0] if len(same_type) == 1 else None
+
+
 def _reminders(phases: list, current_key: Optional[str]) -> list:
     """What the supervisor should be acting on today.
 
@@ -117,13 +143,36 @@ async def list_steps(project_id: str):
     packages = await db.work_packages.find(
         {"project_id": project_id},
         {"_id": 0, "id": 1, "title": 1, "trade_type": 1, "status": 1}).to_list(500)
+    for p in packages:
+        p["step"] = build_sequence.step_for(p["title"], p.get("trade_type"))
 
     by_step: dict = {}
     for p in packages:
-        by_step.setdefault(build_sequence.step_for(p["title"], p.get("trade_type")), []).append(p)
+        by_step.setdefault(p["step"], []).append(p)
 
-    phases, done_items = [], 0
+    phases, done_items, unbooked = [], 0, []
     for phase in supervisor.PHASES:
+        # Which trades this phase needs, and whether each is on the board.
+        stage_key = next((build_sequence.BY_NUMBER[n]["stage_key"]
+                          for n in phase["steps"] if n in build_sequence.BY_NUMBER), "base")
+        trades = []
+        for entry in supervisor.trade_work_for(phase["key"]):
+            match = _match_package(entry, packages, phase["steps"])
+            trades.append({
+                "key": entry["key"], "work": entry["work"], "trade_type": entry["type"],
+                "package": ({"id": match["id"], "title": match["title"],
+                             "status": match["status"], "step": match["step"]}
+                            if match else None),
+                # Everything the board needs to create it in one press.
+                "suggested": {"title": entry["work"], "trade_type": entry["type"],
+                              "stage_key": stage_key},
+            })
+        booked = {e["key"]: e for e in trades}
+        for t in trades:
+            if not t["package"] and not any(u["work"] == t["work"] for u in unbooked):
+                unbooked.append({"phase_key": phase["key"], "phase_letter": phase["letter"],
+                                 "phase_name": phase["name"], "step": phase["steps"][0], **t})
+
         items = []
         for spec in phase["items"]:
             key = f"{phase['key']}:{spec['key']}"
@@ -131,8 +180,14 @@ async def list_steps(project_id: str):
             status = rec.get("status", "todo")
             if status in SETTLED:
                 done_items += 1
+            entry = supervisor.trade_for_item(phase["key"], spec["key"])
             items.append({
                 **spec, "action_key": key, "status": status,
+                # Work a trade does. The board is where it is actioned; here it
+                # is only confirmed, so the item carries the row to look at.
+                "trade": ({"key": entry["key"], "work": entry["work"],
+                           "package": booked[entry["key"]]["package"]}
+                          if entry else None),
                 "note": rec.get("note", ""), "due_date": rec.get("due_date"),
                 "reference": rec.get("reference", ""), "document_id": rec.get("document_id"),
                 "completed_at": rec.get("completed_at"),
@@ -147,6 +202,8 @@ async def list_steps(project_id: str):
             "steps": [{"n": s, "name": build_sequence.BY_NUMBER[s]["name"]}
                       for s in phase["steps"] if s in build_sequence.BY_NUMBER],
             "packages": [{"id": p["id"], "title": p["title"], "status": p["status"]} for p in pkgs],
+            "trades": trades,
+            "unbooked": sum(1 for t in trades if not t["package"]),
             "items": items,
             "done": len(items) - len(outstanding),
             "total": len(items),
@@ -172,9 +229,55 @@ async def list_steps(project_id: str):
         "reminders": reminders[:12],
         "reminder_count": len(reminders),
         "hold_points": [r for r in reminders if r["severity"] == "hold"],
+        # Trade work the checklist expects that nobody is booked for. This is
+        # the join between the two screens: confirm here, act on the board.
+        "unbooked_trades": unbooked,
         "ongoing": supervisor.ONGOING,
         "footnote": supervisor.FOOTNOTE,
     }
+
+
+class BookTrades(BaseModel):
+    keys: list[str] = []      # trade keys to create; empty means every gap
+
+
+@steps_router.get("/projects/{project_id}/trade-gaps")
+async def trade_gaps(project_id: str):
+    """Trade work the checklist expects that nobody is booked for.
+
+    The board asks for this on its own so it does not have to pull all 193
+    checklist items just to know what is missing.
+    """
+    checklist = await list_steps(project_id)
+    return {"project_id": project_id, "unbooked": checklist["unbooked_trades"]}
+
+
+@steps_router.post("/projects/{project_id}/trade-gaps")
+async def book_trades(project_id: str, data: BookTrades,
+                      user: dict = Depends(get_current_user)):
+    """Put missing trade work on the board, where it can be actioned.
+
+    The checklist only confirms; a package is what you send for quotes, award,
+    book and pay. Creating them here means the two screens agree.
+    """
+    from packages import PackageInput, create_package   # local: avoids an import cycle
+
+    gaps = (await trade_gaps(project_id))["unbooked"]
+    wanted = [g for g in gaps if not data.keys or g["work"] in data.keys or g["key"] in data.keys]
+    if not wanted:
+        raise HTTPException(status_code=400, detail="Nothing to add — that work is already on the board.")
+
+    made = []
+    for g in wanted:
+        pkg = await create_package(project_id, PackageInput(
+            title=g["suggested"]["title"],
+            trade_type=g["suggested"]["trade_type"],
+            stage_key=g["suggested"]["stage_key"],
+            scope=f"From the supervisor checklist — phase {g['phase_letter']}, {g['phase_name']}.",
+            source="checklist",
+        ), user=user)
+        made.append({"id": pkg["id"], "title": pkg["title"]})
+    return {"created": made, "count": len(made)}
 
 
 @steps_router.put("/projects/{project_id}/steps/{action_key:path}")

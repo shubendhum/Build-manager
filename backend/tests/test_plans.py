@@ -9,6 +9,8 @@ import io
 import pytest
 import requests
 
+from conftest import real_projects
+
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL').rstrip('/')
 API = f"{BASE_URL}/api"
 CREDS = {"email": "pm@rldtech.com.au", "password": "SitePM-2026"}
@@ -24,7 +26,7 @@ def session():
 
 @pytest.fixture(scope="module")
 def project_id(session):
-    projects = session.get(f"{API}/projects", timeout=15).json()
+    projects = real_projects(session.get(f"{API}/projects", timeout=15).json())
     if not projects:
         pytest.skip("no job to plan against")
     return projects[0]["id"]

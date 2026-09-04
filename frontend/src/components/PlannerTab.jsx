@@ -153,7 +153,7 @@ const ScopeCard = ({ plan, onSaved }) => {
       toast.success("Scope updated successfully.");
       if (onSaved) onSaved();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to save scope.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not save the scope.");
     } finally {
       setSaving(false);
     }
@@ -166,7 +166,7 @@ const ScopeCard = ({ plan, onSaved }) => {
     <section className="rounded-md border border-slate-700 bg-card p-5 mb-6" data-testid="plan-scope-card">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <DraftingCompass className="h-5 w-5 text-amber-400" aria-hidden="true" />
-        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Extracted Scope</h3>
+        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Scope read from the drawings</h3>
         <span className="text-xs text-slate-500">{plan.filename} · {plan.page_count} sheet{plan.page_count === 1 ? "" : "s"} · {formatDateTime(plan.created_at)}</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -255,7 +255,7 @@ const DraftReview = ({ plan, draft, onApplied }) => {
         `and ${data.estimate_lines_created} estimate line(s) added.`);
       onApplied();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to apply the build plan.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not apply the build plan.");
     } finally {
       setApplying(false);
     }
@@ -265,7 +265,7 @@ const DraftReview = ({ plan, draft, onApplied }) => {
     <section className="rounded-md border border-slate-700 bg-card p-5" data-testid="plan-draft-review">
       <div className="flex flex-wrap items-center gap-2 mb-1">
         <ListChecks className="h-5 w-5 text-amber-400" aria-hidden="true" />
-        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Review Build Plan Draft</h3>
+        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Review the draft build plan</h3>
       </div>
       <p className="text-xs text-slate-500 mb-5">Untick anything you don't want, adjust quantities and rates, then apply to the job in one go.</p>
 
@@ -550,7 +550,7 @@ export const PlannerTab = ({ project, onChanged }) => {
       <section className="rounded-md border border-slate-700 bg-card p-5 mb-6">
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="h-5 w-5 text-amber-400" aria-hidden="true" />
-          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">AI Build Planner</h3>
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Read the drawings</h3>
         </div>
         <p className="text-xs text-slate-500 mb-4">
           Pick a drawing from the ones filed on this job and the AI will extract the scope, then draft tasks,
@@ -637,7 +637,7 @@ export const PlannerTab = ({ project, onChanged }) => {
             <div className="rounded-md border border-emerald-600/50 bg-card p-6" data-testid="plan-applied">
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden="true" />
-                <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Build Plan Applied</h3>
+                <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Build plan applied</h3>
               </div>
               <p className="text-sm text-slate-400 mb-4">
                 Tasks were added to the roadmap and lines to the estimate on {formatDateTime(draft.applied_at)}.

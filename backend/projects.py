@@ -229,7 +229,7 @@ async def delete_project(project_id: str):
     # orphans behind (previously only tasks were cascaded).
     for collection in (db.tasks, db.work_packages, db.quotes, db.rfqs, db.notifications,
                        db.invoices, db.claims, db.estimate_lines, db.variations,
-                       db.diary_entries, db.documents, db.plan_analyses):
+                       db.diary_entries, db.documents, db.plan_analyses, db.step_actions):
         await collection.delete_many({"project_id": project_id})
     await db.plan_drafts.delete_many({"plan_id": {"$in": plan_ids}})
     await db.photo_analyses.update_many({"project_id": project_id}, {"$set": {"project_id": None}})

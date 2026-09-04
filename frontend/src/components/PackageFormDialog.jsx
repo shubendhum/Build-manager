@@ -50,7 +50,7 @@ export const PackageFormDialog = ({ open, onOpenChange, projectId, pkg, onSaved 
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save package.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that trade package.");
     } finally {
       setBusy(false);
     }

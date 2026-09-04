@@ -3,7 +3,8 @@ import { toast } from "sonner";
 import {
   ChevronDown, CheckCircle2, Circle, MinusCircle, OctagonAlert, ShieldAlert,
   FileCheck, Stamp, Bell, ShieldCheck, Hammer, ClipboardCheck, Loader2, Package,
-  HardHat, FileText, Users, FlaskConical, NotebookPen, Plug, CalendarClock,
+  HardHat, FileText, Users, FlaskConical, NotebookPen, Plug, CalendarClock, HardHat as Hat,
+  ArrowRight, UserX,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -44,6 +45,12 @@ const SEVERITY = {
 
 // Tapping the circle walks the item forward the way a builder would: not done,
 // done, doesn't apply to this job, back to not done.
+// How a package status reads on a checklist row.
+const PACKAGE_STATE = {
+  draft: "not sent yet", "out-for-quote": "waiting on prices", "quotes-in": "prices in, undecided",
+  awarded: "awarded", ordered: "booked", "in-progress": "on site", complete: "finished",
+};
+
 const NEXT_STATUS = { todo: "done", "in-progress": "done", done: "n-a", "n-a": "todo" };
 const NEEDS_REFERENCE = new Set(["permit", "certificate", "insurance", "inspection", "hold"]);
 const SETTLED = new Set(["done", "n-a"]);
@@ -62,7 +69,7 @@ const StatusButton = ({ status, onClick, busy }) => {
   );
 };
 
-const ItemRow = ({ item, onSet, busy, highlight }) => {
+const ItemRow = ({ item, onSet, busy, highlight, onGoToBoard }) => {
   const k = kindOf(item.kind);
   const Icon = k.icon;
   const settled = SETTLED.has(item.status);
@@ -102,6 +109,28 @@ const ItemRow = ({ item, onSet, busy, highlight }) => {
             <p className="mt-1.5 text-xs text-amber-400/90 break-words">{item.note}</p>
           )}
 
+          {/* A trade does this. You confirm it here; you act on it from the
+              board, so the row is shown but not operated. */}
+          {item.trade && (
+            <p className="mt-1.5" data-testid={`trade-${item.action_key}`}>
+              {item.trade.package ? (
+                <button type="button" onClick={() => onGoToBoard(item.trade.package.id)}
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 transition-colors duration-200">
+                  <Hat className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  <span className="break-words">{item.trade.package.title}</span>
+                  <span className="text-slate-600">·</span>
+                  <span>{PACKAGE_STATE[item.trade.package.status] || item.trade.package.status}</span>
+                  <ArrowRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs text-red-400">
+                  <UserX className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  {item.trade.work} — nobody booked
+                </span>
+              )}
+            </p>
+          )}
+
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider ${k.tone}`}>
               <Icon className="h-3 w-3" aria-hidden="true" /> {k.label}
@@ -137,7 +166,7 @@ const ItemRow = ({ item, onSet, busy, highlight }) => {
   );
 };
 
-const PhaseCard = ({ phase, onSet, busy, highlight, openAll }) => {
+const PhaseCard = ({ phase, onSet, busy, highlight, openAll, onGoToBoard }) => {
   const { current, hold } = phase;
   const [open, setOpen] = useState(current || hold);
   useEffect(() => { if (openAll !== null) setOpen(openAll); }, [openAll]);
@@ -165,9 +194,15 @@ const PhaseCard = ({ phase, onSet, busy, highlight, openAll }) => {
               <span className="block text-sm font-medium text-slate-100 break-words">{phase.name}</span>
               <span className="block text-xs text-slate-500">
                 {phase.done}/{phase.total} done
-                {phase.packages.length > 0 && ` · ${phase.packages.length} trade package${phase.packages.length === 1 ? "" : "s"}`}
+                {phase.trades.length > 0 && ` · ${phase.trades.length - phase.unbooked}/${phase.trades.length} trades on the board`}
               </span>
             </span>
+            {phase.unbooked > 0 && (
+              <Badge variant="outline"
+                className="shrink-0 bg-red-500/15 text-red-400 border-red-500/50 uppercase tracking-wider text-[10px]">
+                {phase.unbooked} not booked
+              </Badge>
+            )}
             {phase.current && (
               <Badge className="shrink-0 bg-amber-500 text-slate-950 hover:bg-amber-500 uppercase tracking-wider text-[10px]">
                 You are here
@@ -182,15 +217,35 @@ const PhaseCard = ({ phase, onSet, busy, highlight, openAll }) => {
         <CollapsibleContent>
           <div className="border-t border-slate-800">
             <p className="px-3 sm:px-4 py-2.5 text-xs text-slate-400 break-words">{phase.detail}</p>
-            {phase.packages.length > 0 && (
-              <p className="px-3 sm:px-4 pb-2.5 text-xs text-slate-500 break-words">
-                Trades in this phase: {phase.packages.map((p) => p.title).join(", ")}
-              </p>
+            {phase.trades.length > 0 && (
+              <div className="px-3 sm:px-4 pb-3">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">
+                  Trades this phase needs
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {phase.trades.map((t) => (
+                    t.package ? (
+                      <button key={t.key} type="button" onClick={() => onGoToBoard(t.package.id)}
+                        data-testid={`phase-trade-${t.key}`}
+                        className="inline-flex items-center gap-1.5 rounded border border-slate-700 bg-slate-800/40 px-2 py-1 text-xs text-slate-300 hover:border-amber-500/50 hover:text-amber-400 transition-colors duration-200">
+                        <Hat className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="break-words">{t.work}</span>
+                      </button>
+                    ) : (
+                      <span key={t.key} data-testid={`phase-trade-${t.key}`}
+                        className="inline-flex items-center gap-1.5 rounded border border-red-500/40 bg-red-500/[0.07] px-2 py-1 text-xs text-red-400">
+                        <UserX className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span className="break-words">{t.work}</span>
+                      </span>
+                    )
+                  ))}
+                </div>
+              </div>
             )}
             <div className="divide-y divide-slate-800 border-t border-slate-800">
               {phase.items.map((i) => (
                 <ItemRow key={i.action_key} item={i} onSet={onSet} busy={busy}
-                  highlight={highlight === i.action_key} />
+                  highlight={highlight === i.action_key} onGoToBoard={onGoToBoard} />
               ))}
             </div>
           </div>
@@ -205,7 +260,7 @@ const PhaseCard = ({ phase, onSet, busy, highlight, openAll }) => {
  * tradie behind it — permits, consents, the checks before something is covered
  * up, the mandatory hold points, the certificates collected on the way out.
  */
-export const BuildStepsTab = ({ projectId }) => {
+export const BuildStepsTab = ({ projectId, onGoToBoard }) => {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [highlight, setHighlight] = useState(null);
@@ -282,9 +337,30 @@ export const BuildStepsTab = ({ projectId }) => {
         </div>
         <Progress value={pct} className="h-2.5 bg-slate-700" />
         <p className="text-xs text-slate-500 mt-2">
-          Your stamped permit drawings and the inspection schedule on the permit take priority over
-          anything here. Licensed work must still be done by the appropriate licensed trade.
+          Everything here is a confirmation — you tick it. The work itself is actioned on the board,
+          and each item that a trade delivers shows the row it belongs to. Your stamped permit
+          drawings and the inspection schedule on the permit take priority over anything here.
         </p>
+
+        {data.unbooked_trades?.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-700/70" data-testid="unbooked-summary">
+            <p className="flex flex-wrap items-center gap-2 text-sm text-red-300 mb-2">
+              <UserX className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                <b className="font-heading">{data.unbooked_trades.length}</b> pieces of trade work
+                have nobody booked
+              </span>
+            </p>
+            <p className="text-xs text-slate-400 mb-2 break-words">
+              {data.unbooked_trades.map((u) => u.work).join(" · ")}
+            </p>
+            <button type="button" onClick={() => onGoToBoard()}
+              data-testid="go-book-trades"
+              className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors duration-200">
+              Add them on the board <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </section>
 
       {data.reminders?.length > 0 && (
@@ -341,7 +417,7 @@ export const BuildStepsTab = ({ projectId }) => {
       <div className="space-y-2">
         {data.phases.map((p) => (
           <PhaseCard key={p.key} phase={p} onSet={set} busy={busy}
-            highlight={highlight} openAll={openAll} />
+            highlight={highlight} openAll={openAll} onGoToBoard={onGoToBoard} />
         ))}
       </div>
 

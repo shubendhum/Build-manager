@@ -77,7 +77,7 @@ export const DiaryEntryDialog = ({ open, onOpenChange, projectId, entry, onSaved
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save diary entry.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that diary entry.");
     } finally {
       setBusy(false);
     }

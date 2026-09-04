@@ -51,7 +51,7 @@ export const RateFormDialog = ({ open, onOpenChange, rate, onSaved }) => {
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save rate item.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that price.");
     } finally {
       setBusy(false);
     }
@@ -61,7 +61,7 @@ export const RateFormDialog = ({ open, onOpenChange, rate, onSaved }) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg bg-card border-slate-700" data-testid="rate-form-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-lg font-bold text-slate-100">{isEdit ? "Edit Rate Item" : "Add Rate Item"}</DialogTitle>
+          <DialogTitle className="font-heading text-lg font-bold text-slate-100">{isEdit ? "Edit price" : "Add a price"}</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">Per-unit rates, AUD ex-GST.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-2 gap-4">

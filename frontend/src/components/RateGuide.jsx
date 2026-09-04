@@ -49,7 +49,7 @@ export const RateGuide = () => {
       setRates(data);
       toast.success("Rate guide reset to 2025 reference defaults");
     } catch (e) {
-      toast.error("Failed to reset rate guide.");
+      toast.error("Could not reset the prices.");
     }
   };
 
@@ -59,7 +59,7 @@ export const RateGuide = () => {
       toast.success("Rate item deleted");
       fetchRates();
     } catch (e) {
-      toast.error("Failed to delete rate item.");
+      toast.error("Could not delete that price.");
     }
   };
 

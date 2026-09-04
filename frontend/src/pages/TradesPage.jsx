@@ -30,7 +30,7 @@ export default function TradesPage() {
       toast.success("Trade deleted");
       fetchTrades();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to delete trade.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not delete that tradie.");
     }
   };
 

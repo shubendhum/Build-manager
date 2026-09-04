@@ -36,7 +36,7 @@ export const PaymentDialog = ({ open, onOpenChange, invoice, onSaved }) => {
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to record payment.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not record that payment.");
     } finally {
       setBusy(false);
     }
@@ -48,7 +48,7 @@ export const PaymentDialog = ({ open, onOpenChange, invoice, onSaved }) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md bg-card border-slate-700" data-testid="payment-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-lg font-bold text-slate-100">Record Payment</DialogTitle>
+          <DialogTitle className="font-heading text-lg font-bold text-slate-100">Record a payment</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">
             {invoice.invoice_number} — balance {formatMoney(invoice.balance)}
           </DialogDescription>

@@ -297,7 +297,7 @@ export const PhotosTab = ({ project }) => {
         <div className="rounded-md border border-slate-700 bg-card p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Camera className="h-5 w-5 text-amber-400" aria-hidden="true" />
-            <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Add Progress Photo</h3>
+            <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Add a progress photo</h3>
           </div>
           <UploadZone file={file} previewUrl={previewUrl} onFileSelected={onFileSelected} onClear={onClear} disabled={analyzing} />
           <div className="flex flex-wrap items-end gap-3">
@@ -333,7 +333,7 @@ export const PhotosTab = ({ project }) => {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
-          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Site Diary</h3>
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Site diary</h3>
           <span className="text-xs text-slate-500" data-testid="photos-count">
             {entries.length} entr{entries.length === 1 ? "y" : "ies"} · {photos.length} photo{photos.length === 1 ? "" : "s"}
           </span>
@@ -403,7 +403,7 @@ export const PhotosTab = ({ project }) => {
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
         <DialogContent className="bg-card border-slate-700 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-heading uppercase tracking-wider text-slate-100">Export Site Diary</DialogTitle>
+            <DialogTitle className="font-heading uppercase tracking-wider text-slate-100">Export the site diary</DialogTitle>
             <DialogDescription className="text-slate-400">
               Generates a PDF of date-grouped photo entries with AI notes. Leave dates empty to include everything.
             </DialogDescription>

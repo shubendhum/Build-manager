@@ -5,6 +5,7 @@ cover every step of the build sequence), then the endpoints are exercised
 against the live job.
 """
 import os
+import uuid
 from datetime import date, timedelta
 
 import pytest
@@ -27,10 +28,20 @@ def session():
 
 @pytest.fixture(scope="module")
 def project_id(session):
-    projects = session.get(f"{API}/projects", timeout=30).json()
-    if not projects:
-        pytest.skip("no project to run the checklist against")
-    return projects[0]["id"]
+    """A job of its own.
+
+    These tests tick items, set due dates and write permit numbers. Run against
+    the first job on the system they were doing that to a real build — a test
+    permit number ended up on a real building permit that way.
+    """
+    r = session.post(f"{API}/projects", timeout=30, json={
+        "name": f"STEPSTEST {uuid.uuid4().hex[:8]}", "client_name": "C",
+        "site_suburb": "Tarneit", "site_postcode": "3029",
+    })
+    assert r.status_code in (200, 201), r.text
+    pid = r.json()["id"]
+    yield pid
+    session.delete(f"{API}/projects/{pid}", timeout=30)
 
 
 class TestChecklistData:
@@ -262,3 +273,111 @@ class TestOneSourceOfTruth:
         d = session.get(f"{API}/dashboard", timeout=120).json()
         assert "hold_points" in d and "checklist_overdue" in d
         assert "inspections" not in d, "the widget that read seeded tasks is gone"
+
+
+class TestChecklistMeetsBoard:
+    """The checklist confirms; the board actions. Every piece of trade work the
+    checklist names has to resolve to a board row, or be reported as missing."""
+
+    def test_every_trade_entry_names_items_that_exist(self):
+        for phase_key, entries in supervisor.TRADE_WORK.items():
+            phase = supervisor.BY_KEY[phase_key]
+            keys = {i["key"] for i in phase["items"]}
+            for e in entries:
+                assert set(e["items"]) <= keys, f"{phase_key}/{e['key']} names a missing item"
+                assert e["match"], f"{e['key']} has no keywords to match a package by"
+
+    def test_trade_types_are_real(self):
+        from trades import TRADE_TYPES
+        for entries in supervisor.TRADE_WORK.values():
+            for e in entries:
+                assert e["type"] in TRADE_TYPES, f"{e['key']} has type {e['type']}"
+
+    def test_a_matched_item_carries_its_board_row(self, session, project_id):
+        session.post(f"{API}/projects/{project_id}/packages", timeout=60,
+                     json={"title": "Plumbing Rough-in & Fit-off", "trade_type": "plumber",
+                           "stage_key": "lockup"})
+        d = session.get(f"{API}/projects/{project_id}/steps", timeout=60).json()
+        withtrade = [i for p in d["phases"] for i in p["items"] if i["trade"]]
+        assert withtrade, "some items are delivered by a trade"
+        for i in withtrade:
+            assert "work" in i["trade"]
+            if i["trade"]["package"]:
+                assert i["trade"]["package"]["id"] and i["trade"]["package"]["title"]
+
+    def test_the_catch_all_trade_type_never_matches_by_type_alone(self):
+        """"other" covers the scaffolder, the window supplier and the cleaner, so
+        matching on it would put any of them against any other."""
+        from steps import _match_package
+        packages = [{"id": "1", "title": "Windows & External Doors", "trade_type": "other",
+                     "status": "draft", "step": 11}]
+        entry = {"key": "scaffold", "work": "Scaffolding", "type": "other", "match": ["scaffold"]}
+        assert _match_package(entry, packages, [10, 11, 12]) is None
+
+    def test_a_keyword_prefers_the_package_in_this_phase(self):
+        """"roof" matches the frame carpenter's roof structure and the roofer;
+        only the second is roofing."""
+        from steps import _match_package
+        packages = [{"id": "1", "title": "Timber Frame & Roof Structure", "trade_type": "carpenter",
+                     "status": "draft", "step": 7},
+                    {"id": "2", "title": "Roofing & Gutters", "trade_type": "roofer",
+                     "status": "draft", "step": 10}]
+        entry = {"key": "roofer", "work": "Roofing", "type": "roofer", "match": ["roof"]}
+        assert _match_package(entry, packages, [10, 11, 12])["id"] == "2"
+
+    def test_one_package_can_cover_two_visits(self):
+        """The plumber's rough-in and fit-off are normally one engagement."""
+        from steps import _match_package
+        packages = [{"id": "1", "title": "Plumbing Rough-in & Fit-off", "trade_type": "plumber",
+                     "status": "draft", "step": 13}]
+        entry = {"key": "plumber-fitoff", "work": "Plumbing fit-off", "type": "plumber",
+                 "match": ["plumb"]}
+        assert _match_package(entry, packages, [20, 21])["id"] == "1"
+
+    def test_booking_a_gap_puts_it_on_the_board_and_closes_the_gap(self, session):
+        made = session.post(f"{API}/projects", timeout=60, json={
+            "name": "GAPTEST scratch", "client_name": "C",
+            "site_suburb": "Tarneit", "site_postcode": "3029"}).json()["id"]
+        try:
+            gaps = session.get(f"{API}/projects/{made}/trade-gaps", timeout=60).json()["unbooked"]
+            # Counted once per engagement: the concreter, the HVAC installer and
+            # the garage-door fitter are each named by two phases.
+            distinct = {e["work"] for v in supervisor.TRADE_WORK.values() for e in v}
+            assert {g["work"] for g in gaps} == distinct
+
+            one = session.post(f"{API}/projects/{made}/trade-gaps", timeout=60,
+                               json={"keys": ["Insulation"]})
+            assert one.status_code == 200, one.text
+            assert one.json()["count"] == 1
+
+            rest = session.post(f"{API}/projects/{made}/trade-gaps", timeout=120, json={})
+            assert rest.status_code == 200, rest.text
+
+            after = session.get(f"{API}/projects/{made}/trade-gaps", timeout=60).json()["unbooked"]
+            assert after == [], f"still unbooked: {[g['work'] for g in after]}"
+
+            # And every checklist item now points at a real row.
+            d = session.get(f"{API}/projects/{made}/steps", timeout=60).json()
+            orphan = [t["work"] for p in d["phases"] for t in p["trades"] if not t["package"]]
+            assert orphan == [], orphan
+
+            again = session.post(f"{API}/projects/{made}/trade-gaps", timeout=60, json={})
+            assert again.status_code == 400, "nothing left to add"
+        finally:
+            session.delete(f"{API}/projects/{made}", timeout=60)
+
+    def test_a_booked_package_lands_at_the_right_step(self, session):
+        """A package created from the checklist must place itself in the build
+        sequence, or it piles up at step 1 where nothing is."""
+        made = session.post(f"{API}/projects", timeout=60, json={
+            "name": "GAPSTEP scratch", "client_name": "C",
+            "site_suburb": "Tarneit", "site_postcode": "3029"}).json()["id"]
+        try:
+            session.post(f"{API}/projects/{made}/trade-gaps", timeout=120, json={})
+            rows = session.get(f"{API}/projects/{made}/board", timeout=60).json()["rows"]
+            at_one = [r["title"] for r in rows if r["step"] == 1]
+            # Only the genuine pre-start work belongs at step 1.
+            assert set(at_one) <= {"Site establishment", "Surveyor set-out"}, \
+                f"unplaced packages piled up at step 1: {at_one}"
+        finally:
+            session.delete(f"{API}/projects/{made}", timeout=60)

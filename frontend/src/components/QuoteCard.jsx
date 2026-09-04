@@ -29,7 +29,7 @@ export const QuoteCard = ({ quote, packageTitle, onAccept, onEdit, onDelete, onU
       toast.success("Attachment uploaded");
       onUploaded();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to upload attachment.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not attach that file.");
     }
   };
 

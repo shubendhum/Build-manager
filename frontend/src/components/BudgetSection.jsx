@@ -48,7 +48,8 @@ export const BudgetSection = ({ projectId, refreshKey }) => {
     <section data-testid="budget-section">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <Scale className="h-5 w-5 text-amber-400" aria-hidden="true" />
-        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Budget Tracking</h3>
+        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Budget tracking</h3>
+          <p className="text-xs text-slate-500 mt-0.5">The estimate against what is actually committed and paid.</p>
         <Badge variant="outline" className={`uppercase tracking-wider text-[10px] ${HEALTH_STYLES[totals.health]}`} data-testid="budget-health-badge">
           {HEALTH_LABELS[totals.health]}
         </Badge>
@@ -143,7 +144,7 @@ export const BudgetSection = ({ projectId, refreshKey }) => {
 
       <h4 className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-3">By Work Package</h4>
       {by_work_package.length === 0 ? (
-        <p className="text-sm text-slate-500" data-testid="budget-wp-empty">No quoted work packages yet.</p>
+        <p className="text-sm text-slate-500" data-testid="budget-wp-empty">No trade package has a price against it yet.</p>
       ) : (
         <div className="rounded-md border border-slate-700 bg-card overflow-x-auto">
           <table className="w-full text-sm" data-testid="budget-wp-table">

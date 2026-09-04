@@ -130,7 +130,7 @@ export const SendRfqDialog = ({ open, onOpenChange, projectId, pkg, trades, docu
       if (outcome.failed === 0) toast.success(`Sent to ${outcome.sent} trade${outcome.sent === 1 ? "" : "s"}`);
       else toast.warning(`${outcome.sent} sent, ${outcome.failed} failed — see the details.`);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to send quote request.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not send that quote request.");
     } finally {
       setBusy(false);
     }

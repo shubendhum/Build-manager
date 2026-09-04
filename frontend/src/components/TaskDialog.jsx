@@ -51,7 +51,7 @@ export const TaskDialog = ({ open, onOpenChange, projectId, stageKey, task, onSa
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save task.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that task.");
     } finally {
       setBusy(false);
     }
@@ -61,7 +61,7 @@ export const TaskDialog = ({ open, onOpenChange, projectId, stageKey, task, onSa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg bg-card border-slate-700" data-testid="task-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-lg font-bold text-slate-100">{isEdit ? "Edit Task" : "Add Task"}</DialogTitle>
+          <DialogTitle className="font-heading text-lg font-bold text-slate-100">{isEdit ? "Edit task" : "Add a task"}</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">
             {isEdit ? "Update task details." : "Add a custom task to this stage."}
           </DialogDescription>

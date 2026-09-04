@@ -11,6 +11,7 @@ import pytest
 import requests
 
 import agent
+from conftest import real_projects
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://localhost:3080").rstrip("/")
 API = f"{BASE_URL}/api"
@@ -38,11 +39,16 @@ def session():
 
 @pytest.fixture(scope="module")
 def project_id(session):
+    """A job with real data on it.
+
+    Not simply the first one: another worker's scratch job can appear at the top
+    of the list and be deleted underneath these tests mid-run.
+    """
     r = session.get(f"{API}/projects", timeout=30)
     assert r.status_code == 200
-    projects = r.json()
+    projects = real_projects(r.json())
     if not projects:
-        pytest.skip("no project to ask about")
+        pytest.skip("no job to ask about")
     return projects[0]["id"]
 
 

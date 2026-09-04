@@ -70,7 +70,7 @@ export const EstimateLineDialog = ({ open, onOpenChange, projectId, line, rates,
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save line.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that line.");
     } finally {
       setBusy(false);
     }

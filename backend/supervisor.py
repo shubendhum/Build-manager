@@ -650,3 +650,187 @@ def find(action_key: str) -> Optional[tuple]:
 def phase_for_step(step_n: int) -> Optional[dict]:
     """Which phase of the checklist a sequence step belongs to."""
     return next((p for p in PHASES if step_n in p["steps"]), None)
+
+
+# ---------------------------------------------------------------------------
+# Who actually does the work.
+#
+# The checklist is for confirming; the board is for acting. So every item here
+# that is delivered by a trade names that trade, and the API resolves it to the
+# board package that covers it. An item with no package behind it is work
+# nobody is booked for — which is the thing worth knowing early, and the reason
+# this mapping exists rather than the two screens just sitting side by side.
+#
+# match: keywords tried against a package title, most specific first. A package
+# is looked for across the whole board, not just this phase's steps, because one
+# package routinely covers two visits (the plumber's rough-in and fit-off are
+# usually the same engagement).
+# type:  the trade type used if a package has to be created, and the fallback
+#        when no title matches.
+# items: the checklist items this trade delivers.
+TRADE_WORK = {
+    "b": [
+        {"key": "site-setup", "work": "Site establishment", "type": "other",
+         "match": ["site establish", "fencing and amenities", "site set-up", "site setup"],
+         "items": ["temp-fencing", "signage", "amenities", "temp-power",
+                   "sediment-controls", "stabilised-access", "protect-neighbours"]},
+    ],
+    "c": [
+        {"key": "surveyor", "work": "Surveyor set-out", "type": "other",
+         "match": ["survey", "set-out", "setout"],
+         "items": ["surveyor-setout", "setbacks-check", "datum-and-ffl", "recheck-setout"]},
+        {"key": "earthworks", "work": "Site cut and earthworks", "type": "excavator-earthworks",
+         "match": ["site cut", "earthwork", "excavat", "site prep", "bulk earth"],
+         "items": ["clear-vegetation", "strip-topsoil", "site-cut", "retaining-walls"]},
+        {"key": "soil-testing", "work": "Compaction testing", "type": "other",
+         "match": ["compaction", "geotech", "soil test"],
+         "items": ["compaction-test"]},
+    ],
+    "d": [
+        {"key": "footings", "work": "Footing excavation", "type": "excavator-earthworks",
+         "match": ["footing", "excavat", "pier", "pile"],
+         "items": ["excavate-footings"]},
+        {"key": "plumber-underslab", "work": "Under-slab plumbing", "type": "plumber",
+         "match": ["plumb", "drainage", "sewer"],
+         "items": ["plumber-under-slab", "drainage-test"]},
+        {"key": "sparky-underslab", "work": "Under-slab electrical", "type": "electrician",
+         "match": ["electric", "sparky"],
+         "items": ["electrician-under-slab", "comms-conduits"]},
+        {"key": "termite", "work": "Termite management", "type": "other",
+         "match": ["termite"],
+         "items": ["termite-management"]},
+        {"key": "slab", "work": "Concrete slab", "type": "concreter",
+         "match": ["slab", "waffle", "concret"],
+         "items": ["sand-and-vapour-barrier", "formwork-and-reo"]},
+    ],
+    "e": [
+        {"key": "slab", "work": "Concrete slab", "type": "concreter",
+         "match": ["slab", "waffle", "concret", "pour"],
+         "items": ["supervise-pour", "curing", "protect-slab"]},
+    ],
+    "f": [
+        {"key": "carpenter-frame", "work": "Frame and trusses", "type": "carpenter",
+         "match": ["frame", "truss", "carpent"],
+         "items": ["check-delivery", "store-timber", "supervise-erection", "wall-locations",
+                   "beams-and-lintels", "roof-trusses", "bracing", "tie-downs",
+                   "frame-alignment", "noggins", "frame-defects"]},
+    ],
+    "g": [
+        {"key": "scaffold", "work": "Scaffolding", "type": "other",
+         "match": ["scaffold"],
+         "items": ["scaffold"]},
+        {"key": "roofer", "work": "Roofing and gutters", "type": "roofer",
+         "match": ["roof", "gutter", "fascia"],
+         "items": ["fascia-and-gutters", "roof-cover", "flashings", "temporary-downpipes"]},
+        {"key": "windows", "work": "Windows and external doors", "type": "other",
+         "match": ["window", "external door", "glazing"],
+         "items": ["wall-wrap", "windows-and-doors"]},
+        {"key": "cladding", "work": "Brickwork or cladding", "type": "bricklayer",
+         "match": ["brick", "cladding", "hebel", "masonry", "render"],
+         "items": ["cladding", "eaves-and-trims"]},
+        {"key": "garage-door", "work": "Garage door", "type": "other",
+         "match": ["garage door"],
+         "items": ["garage-door"]},
+    ],
+    "h": [
+        {"key": "plumber-rough", "work": "Plumbing rough-in", "type": "plumber",
+         "match": ["plumb"],
+         "items": ["plumbing-rough-in", "pressure-test"]},
+        {"key": "hvac-rough", "work": "Heating and cooling", "type": "other",
+         "match": ["heating", "cooling", "hvac", "air con", "aircon", "refrigerat"],
+         "items": ["hvac-rough-in"]},
+        {"key": "sparky-rough", "work": "Electrical rough-in", "type": "electrician",
+         "match": ["electric", "sparky"],
+         "items": ["electrical-rough-in", "comms-cabling"]},
+    ],
+    "i": [
+        {"key": "insulation", "work": "Insulation", "type": "other",
+         "match": ["insulation", "batts"],
+         "items": ["install-insulation", "acoustic-insulation"]},
+    ],
+    "j": [
+        {"key": "plasterer", "work": "Plastering", "type": "plasterer",
+         "match": ["plaster", "lining", "cornice"],
+         "items": ["ceiling-plaster", "wall-linings", "cornices", "stopping-and-sanding"]},
+        {"key": "fixing-carpentry", "work": "Internal fixing carpentry", "type": "carpenter",
+         "match": ["internal fix", "fixing carpent", "skirting", "architrave", "internal door"],
+         "items": ["doors-and-jambs", "internal-trim", "stairs-and-balustrades"]},
+    ],
+    "k": [
+        {"key": "waterproofer", "work": "Wet area waterproofing", "type": "waterproofer",
+         "match": ["waterproof"],
+         "items": ["substrate-prep", "waterproofing"]},
+        {"key": "tiler", "work": "Tiling", "type": "tiler",
+         "match": ["til", "screed"],
+         "items": ["screeds", "tiling"]},
+        {"key": "cabinetry", "work": "Cabinetry and benchtops", "type": "other",
+         "match": ["cabinet", "joinery", "kitchen", "benchtop", "splashback"],
+         "items": ["cabinetry", "benchtops", "splashbacks"]},
+    ],
+    "l": [
+        {"key": "painter", "work": "Painting", "type": "painter",
+         "match": ["paint"],
+         "items": ["surface-preparation", "paint"]},
+        {"key": "flooring", "work": "Flooring", "type": "other",
+         "match": ["floor", "carpet", "vinyl", "timber floor"],
+         "items": ["flooring"]},
+        {"key": "wardrobes", "work": "Wardrobes and shelving", "type": "other",
+         "match": ["wardrobe", "shelving", "robe"],
+         "items": ["wardrobes-and-hardware"]},
+        {"key": "screens", "work": "Shower screens and mirrors", "type": "other",
+         "match": ["shower screen", "mirror", "glazier"],
+         "items": ["screens-and-mirrors", "caulking"]},
+    ],
+    "m": [
+        {"key": "sparky-fitoff", "work": "Electrical fit-off", "type": "electrician",
+         "match": ["electric", "sparky"],
+         "items": ["electrical-fit-off", "electrical-tests"]},
+        {"key": "plumber-fitoff", "work": "Plumbing fit-off", "type": "plumber",
+         "match": ["plumb"],
+         "items": ["plumbing-fit-off", "plumbing-commission", "drain-test"]},
+        {"key": "hvac-fitoff", "work": "Heating and cooling", "type": "other",
+         "match": ["heating", "cooling", "hvac", "air con", "aircon"],
+         "items": ["hvac-fit-off", "hvac-test"]},
+        {"key": "garage-motor", "work": "Garage door", "type": "other",
+         "match": ["garage door"],
+         "items": ["garage-door-motor"]},
+    ],
+    "n": [
+        {"key": "stormwater", "work": "Stormwater and external plumbing", "type": "plumber",
+         "match": ["stormwater", "external plumb", "downpipe", "tank"],
+         "items": ["stormwater-to-lpod", "downpipes", "rainwater-tank"]},
+        {"key": "driveway", "work": "Driveway, paths and crossover", "type": "concreter",
+         "match": ["driveway", "crossover", "path", "paving"],
+         "items": ["paths-and-dpc", "driveway-and-crossover"]},
+        {"key": "fencing", "work": "Fencing, gates and letterbox", "type": "other",
+         "match": ["fenc", "gate", "letterbox", "clothesline"],
+         "items": ["fencing-and-fittings"]},
+        {"key": "landscaping", "work": "Landscaping and nature strip", "type": "other",
+         "match": ["landscap", "nature strip", "turf", "garden"],
+         "items": ["landscaping", "reinstate-nature-strip", "finished-ground-levels"]},
+        {"key": "site-clean", "work": "Waste removal and site clean", "type": "other",
+         "match": ["clean", "waste", "rubbish", "skip"],
+         "items": ["remove-waste", "clean-drains"]},
+    ],
+    "o": [
+        {"key": "builders-clean", "work": "Builder's clean", "type": "other",
+         "match": ["clean"],
+         "items": ["rectify-and-clean"]},
+    ],
+}
+
+# item key -> the trade entry that delivers it, for the phase it sits in.
+TRADE_FOR_ITEM = {
+    (phase_key, item_key): entry
+    for phase_key, entries in TRADE_WORK.items()
+    for entry in entries
+    for item_key in entry["items"]
+}
+
+
+def trade_work_for(phase_key: str) -> list:
+    return TRADE_WORK.get(phase_key, [])
+
+
+def trade_for_item(phase_key: str, item_key: str) -> Optional[dict]:
+    return TRADE_FOR_ITEM.get((phase_key, item_key))

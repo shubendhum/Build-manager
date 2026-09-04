@@ -29,10 +29,10 @@ export const EstimatorSection = ({ project, onChanged }) => {
   const remove = async (line) => {
     try {
       await api.delete(`/estimate-lines/${line.id}`);
-      toast.success("Line deleted");
+      toast.success("Line removed");
       refresh();
     } catch (e) {
-      toast.error("Failed to delete line.");
+      toast.error("Could not remove that line.");
     }
   };
 
@@ -42,7 +42,7 @@ export const EstimatorSection = ({ project, onChanged }) => {
       setData(d);
       onChanged?.();
     } catch (e) {
-      toast.error("Failed to update contingency.");
+      toast.error("Could not save the contingency.");
     }
   };
 
@@ -50,7 +50,7 @@ export const EstimatorSection = ({ project, onChanged }) => {
     try {
       const { data: blob } = await api.get(`/projects/${project.id}/estimate.pdf`, { responseType: "blob", timeout: 60000 });
       downloadBlob(blob, `Estimate-${project.name.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`);
-      toast.success("Estimate PDF downloaded.");
+      toast.success("Estimate saved as a PDF.");
     } catch (e) {
       toast.error(await readBlobError(e));
     }
@@ -65,7 +65,8 @@ export const EstimatorSection = ({ project, onChanged }) => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Calculator className="h-5 w-5 text-amber-400" aria-hidden="true" />
-          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Cost Estimator</h3>
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Cost estimate</h3>
+          <p className="text-xs text-slate-500 mt-0.5">What you expect the job to cost, priced from your rates.</p>
           <span className="text-xs text-slate-500">{lines.length} line{lines.length === 1 ? "" : "s"}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -83,7 +84,7 @@ export const EstimatorSection = ({ project, onChanged }) => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         <div className="xl:col-span-2 rounded-md border border-slate-700 bg-card overflow-x-auto">
           {lines.length === 0 ? (
-            <p className="text-sm text-slate-500 p-6" data-testid="estimate-empty">No estimate lines yet. Add lines manually or from the rate guide.</p>
+            <p className="text-sm text-slate-500 p-6" data-testid="estimate-empty">Nothing estimated yet. Add lines manually or from the rate guide.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>

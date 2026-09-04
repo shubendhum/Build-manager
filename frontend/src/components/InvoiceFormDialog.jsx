@@ -73,7 +73,7 @@ export const InvoiceFormDialog = ({ open, onOpenChange, projectId, invoice, trad
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save invoice.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that invoice.");
     } finally {
       setBusy(false);
     }
@@ -83,7 +83,7 @@ export const InvoiceFormDialog = ({ open, onOpenChange, projectId, invoice, trad
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-slate-700" data-testid="invoice-form-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit Invoice" : "Add Invoice"}</DialogTitle>
+          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit invoice" : "Add invoice"}</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">Payable from a trade — optionally linked to an accepted quote.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
@@ -135,7 +135,7 @@ export const InvoiceFormDialog = ({ open, onOpenChange, projectId, invoice, trad
               className="border-slate-600 text-slate-300 hover:text-slate-100 hover:bg-slate-800">Cancel</Button>
             <Button type="submit" data-testid="invoice-form-save-button" disabled={busy}
               className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : isEdit ? "Save" : "Add Invoice"}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : isEdit ? "Save" : "Add invoice"}
             </Button>
           </div>
         </form>

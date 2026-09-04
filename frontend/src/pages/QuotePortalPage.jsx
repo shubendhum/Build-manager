@@ -88,7 +88,7 @@ export default function QuotePortalPage() {
       setSubmitted(true);
       window.scrollTo({ top: 0 });
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to submit quote. Please try again.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not send your quote — please try again.");
       if (err.response?.status === 409) setSubmitted(true);
     } finally {
       setBusy(false);

@@ -64,7 +64,7 @@ const VariationFormDialog = ({ open, onOpenChange, projectId, variation, onSaved
       onOpenChange(false);
       onSaved?.();
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save variation.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that variation.");
     } finally {
       setBusy(false);
     }
@@ -150,7 +150,7 @@ export const VariationsTab = ({ projectId, onChanged }) => {
       fetchData();
       onChanged?.();
     } catch (e) {
-      toast.error("Failed to update variation status.");
+      toast.error("Could not change that variation's status.");
     }
   };
 
@@ -161,7 +161,7 @@ export const VariationsTab = ({ projectId, onChanged }) => {
       fetchData();
       onChanged?.();
     } catch (e) {
-      toast.error("Failed to delete variation.");
+      toast.error("Could not delete that variation.");
     }
   };
 
@@ -176,7 +176,8 @@ export const VariationsTab = ({ projectId, onChanged }) => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2">
           <GitBranch className="h-5 w-5 text-amber-400" aria-hidden="true" />
-          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Variations Register</h3>
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Variations</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Approved changes to the contract, and what each one is worth.</p>
           {variations.length > 0 && (
             <span className="text-xs text-slate-500" data-testid="variations-approved-total">
               Approved impact:{" "}

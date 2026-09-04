@@ -212,3 +212,38 @@ class TestProjectCascade:
             assert session.get(f"{API}/projects/{pid}/packages", timeout=T).status_code == 404
         finally:
             session.delete(f"{API}/projects/{pid}", timeout=T)   # no-op once deleted
+
+
+class TestChecklistCascade:
+    """Deleting a job has to take its checklist with it, or a permit number
+    ticked on a deleted job outlives it in the database."""
+
+    def test_delete_project_removes_its_checklist(self, session):
+        r = session.post(f"{API}/projects", timeout=T, json={
+            "name": f"CASCADE-STEPS {uuid.uuid4().hex[:8]}", "client_name": "C",
+            "site_suburb": "Ballarat", "site_postcode": "3350",
+        })
+        pid = r.json()["id"]
+        try:
+            put = session.put(f"{API}/projects/{pid}/steps/a:permit-obtained", timeout=T,
+                              json={"status": "done", "reference": "BP-CASCADE-1"})
+            assert put.status_code == 200, put.text
+            assert put.json()["items_done"] == 1
+
+            assert session.delete(f"{API}/projects/{pid}", timeout=T).status_code == 200
+            assert session.get(f"{API}/projects/{pid}/steps", timeout=T).status_code == 404
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=T)
+
+    def test_a_fresh_job_starts_with_an_empty_checklist(self, session):
+        """A recreated job must not inherit a deleted one's ticks."""
+        r = session.post(f"{API}/projects", timeout=T, json={
+            "name": f"FRESH {uuid.uuid4().hex[:8]}", "client_name": "C",
+            "site_suburb": "Ballarat", "site_postcode": "3350",
+        })
+        pid = r.json()["id"]
+        try:
+            d = session.get(f"{API}/projects/{pid}/steps", timeout=T).json()
+            assert d["items_done"] == 0
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=T)

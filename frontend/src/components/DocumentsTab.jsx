@@ -59,7 +59,7 @@ export const DocumentsTab = ({ projectId }) => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-2">
           <FolderOpen className="h-5 w-5 text-amber-400" aria-hidden="true" />
-          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Documents</h3>
+          <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Files on this job</h3>
           <span className="text-xs text-slate-500" data-testid="documents-count">{docs.length} file{docs.length === 1 ? "" : "s"}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">

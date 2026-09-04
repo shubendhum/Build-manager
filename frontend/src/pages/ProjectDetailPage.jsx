@@ -44,9 +44,15 @@ export default function ProjectDetailPage() {
   const [steps, setSteps] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
+  const [focusPackage, setFocusPackage] = useState(null);
+
   const requested = searchParams.get("tab");
   const leaf = KEYS.includes(requested) ? requested : MOVED[requested] || "work";
   const setLeaf = (v) => setSearchParams(v === "work" ? {} : { tab: v }, { replace: true });
+
+  // The checklist confirms; the board acts. Following a trade from a checklist
+  // item lands on its row rather than dropping you at the top of the board.
+  const goToBoard = (packageId) => { setFocusPackage(packageId || null); setLeaf("work"); };
 
   const fetchProject = useCallback(async () => {
     try {
@@ -88,10 +94,10 @@ export default function ProjectDetailPage() {
     work: (
       <>
         {steps?.actions.length > 0 && <NextSteps data={steps} onGo={setLeaf} />}
-        <TradeBoard projectId={project.id} />
+        <TradeBoard projectId={project.id} focusPackageId={focusPackage} />
       </>
     ),
-    steps: <BuildStepsTab projectId={project.id} />,
+    steps: <BuildStepsTab projectId={project.id} onGoToBoard={goToBoard} />,
     drawings: <DrawingsTab project={project} onChanged={refresh} />,
     money: <MoneyTab project={project} />,
     diary: <PhotosTab project={project} />,

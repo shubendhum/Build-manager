@@ -23,7 +23,7 @@ const ClaimRow = ({ line, onChanged }) => {
       await api.put(`/claims/${line.id}`, updates);
       onChanged();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to update claim line.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not save that claim line.");
     }
   };
 
@@ -79,10 +79,10 @@ export const ClaimsSection = ({ projectId, contractValue }) => {
     setBusy(true);
     try {
       await api.post(`/projects/${projectId}/claims/generate${force ? "?force=true" : ""}`);
-      toast.success("Progress claim schedule generated (5/10/15/35/25/10)");
+      toast.success("Claim schedule generated — 5/10/15/35/25/10");
       fetchClaims();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to generate schedule.");
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not generate the schedule.");
     } finally {
       setBusy(false);
     }
@@ -95,7 +95,8 @@ export const ClaimsSection = ({ projectId, contractValue }) => {
     <section className="mt-12" data-testid="claims-section">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <FileSpreadsheet className="h-5 w-5 text-amber-400" aria-hidden="true" />
-        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Client Progress Claims</h3>
+        <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Client progress claims</h3>
+          <p className="text-xs text-slate-500 mt-0.5">What you can invoice the owner at each payment stage.</p>
         <span className="text-xs text-slate-500">Victorian schedule — Deposit 5% · Base 10% · Frame 15% · Lockup 35% · Fixing 25% · Completion 10%</span>
       </div>
 

@@ -59,7 +59,7 @@ export const TradeFormDialog = ({ open, onOpenChange, trade, onSaved }) => {
       onOpenChange(false);
       onSaved?.(data);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save trade.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that tradie.");
     } finally {
       setBusy(false);
     }
@@ -69,7 +69,7 @@ export const TradeFormDialog = ({ open, onOpenChange, trade, onSaved }) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-slate-700" data-testid="trade-form-dialog">
         <DialogHeader>
-          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit Trade" : "Add Trade"}</DialogTitle>
+          <DialogTitle className="font-heading text-xl font-bold text-slate-100">{isEdit ? "Edit tradie" : "Add a tradie"}</DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">Subcontractor details, licence and insurance.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
