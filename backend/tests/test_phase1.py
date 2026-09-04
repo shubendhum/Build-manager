@@ -136,25 +136,28 @@ class TestProjects:
         r = session.post(f"{API}/projects", json=payload, timeout=15)
         assert r.status_code == 200, r.text
         project = r.json()
-        assert project["progress"] == 0
         pid = project["id"]
+        try:
+            assert project["progress"] == 0
 
-        # verify roadmap generated
-        r2 = session.get(f"{API}/projects/{pid}/roadmap", timeout=15)
-        assert r2.status_code == 200
-        rm = r2.json()
-        total = sum(s["total_count"] for s in rm["stages"])
-        inspections = sum(1 for s in rm["stages"] for t in s["tasks"] if t.get("is_mandatory_inspection"))
-        # Count comes from the template, so it moves with it rather than being
-        # a number to chase every time a task is added.
-        import roadmap_template
-        assert total == sum(len(v) for v in roadmap_template.ROADMAP_TEMPLATE.values())
-        # Mandatory inspections are hold points on the supervisor checklist now;
-        # tracking them here as well meant one could be ticked and the other not.
-        assert inspections == 0
-
-        # cleanup
-        session.delete(f"{API}/projects/{pid}", timeout=15)
+            r2 = session.get(f"{API}/projects/{pid}/roadmap", timeout=15)
+            assert r2.status_code == 200
+            rm = r2.json()
+            total = sum(s["total_count"] for s in rm["stages"])
+            inspections = sum(1 for s in rm["stages"] for t in s["tasks"]
+                              if t.get("is_mandatory_inspection"))
+            # Count comes from the template, so it moves with it rather than
+            # being a number to chase every time a task is added.
+            import roadmap_template
+            assert total == sum(len(v) for v in roadmap_template.ROADMAP_TEMPLATE.values())
+            # Mandatory inspections are hold points on the supervisor checklist
+            # now; tracking them here too meant one could be ticked and not the
+            # other.
+            assert inspections == 0
+        finally:
+            # In a finally: a failed assertion used to leave the job behind on
+            # the real system, and they accumulated.
+            session.delete(f"{API}/projects/{pid}", timeout=15)
 
     def test_invalid_postcode(self, session):
         payload = {
@@ -185,11 +188,14 @@ class TestProjects:
             "name": "TEST_Del", "client_name": "X",
             "site_suburb": "Ballarat", "site_postcode": "3350"}, timeout=15)
         pid = r.json()["id"]
-        r2 = session.delete(f"{API}/projects/{pid}", timeout=15)
-        assert r2.status_code == 200
-        # verify roadmap 404
-        r3 = session.get(f"{API}/projects/{pid}", timeout=15)
-        assert r3.status_code == 404
+        try:
+            r2 = session.delete(f"{API}/projects/{pid}", timeout=15)
+            assert r2.status_code == 200
+            # verify roadmap 404
+            r3 = session.get(f"{API}/projects/{pid}", timeout=15)
+            assert r3.status_code == 404
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=15)   # no-op once deleted
 
 
 # ---------- Tasks ----------

@@ -205,7 +205,10 @@ class TestProjectCascade:
             "site_suburb": "Ballarat", "site_postcode": "3350",
         })
         pid = r.json()["id"]
-        pkg = make_package(session, pid, title="Doomed")
-        make_quote(session, pid, pkg["id"], trades[0], 100)
-        assert session.delete(f"{API}/projects/{pid}", timeout=T).status_code == 200
-        assert session.get(f"{API}/projects/{pid}/packages", timeout=T).status_code == 404
+        try:
+            pkg = make_package(session, pid, title="Doomed")
+            make_quote(session, pid, pkg["id"], trades[0], 100)
+            assert session.delete(f"{API}/projects/{pid}", timeout=T).status_code == 200
+            assert session.get(f"{API}/projects/{pid}/packages", timeout=T).status_code == 404
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=T)   # no-op once deleted
