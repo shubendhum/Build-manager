@@ -8,10 +8,7 @@ services:
     ports:
       - "27018:27017"
     volumes:
-      # Bind mount, not a named volume: the data lives at a path you own and
-      # can see, and cannot be destroyed by `docker volume prune` or a stray
-      # `docker compose down -v`.
-      - /home/docker/buildmanager-data/mongo:/data/db
+      - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: buildmanager
 
@@ -43,7 +40,7 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - /home/docker/buildmanager-data/uploads:/app/backend/uploads
+      - uploads:/app/backend/uploads
     depends_on:
       - mongo
       - clamav
@@ -65,3 +62,6 @@ services:
     depends_on:
       - backend
 
+volumes:
+  mongo_data:
+  uploads:
