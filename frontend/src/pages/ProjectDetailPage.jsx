@@ -21,27 +21,30 @@ import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
 
-// Five plain areas, all visible — no dropdown to hunt through. Anything with
-// more than one screen shows them as a small sub-nav underneath, so every
-// destination is on the page rather than hidden behind "More".
-//
-// The four items that used to sit in that dropdown — quotes, packages,
-// invoices, trades — were duplicates of what the Work board already shows per
-// row. They are kept (they carry detail the board does not, like progress
-// claims and manual quote entry) but filed under the area they belong to.
+// Tabs with sub-tabs meant you had to click a group to discover what was inside
+// it — you cannot find a screen you do not know exists. Every destination is now
+// listed at once, grouped by heading: a rail on a wide screen, a single select
+// on a phone. Nothing to hunt for.
 const AREAS = [
-  { key: "work", label: "Work", icon: Hammer, children: [
-      ["work", "Board"], ["packages", "Packages"], ["quotes", "Quotes"], ["trades", "Tradies"],
+  { key: "work", label: "The work", icon: Hammer, children: [
+      ["work", "Trade board", "who is doing what, and where each is up to"],
+      ["packages", "Packages", "the scopes you send out for quotes"],
+      ["quotes", "Quotes & requests", "prices in, and who you asked"],
+      ["trades", "Tradies on this job", "assigned to this job"],
   ] },
-  { key: "plan", label: "Plan", icon: FileSearch, children: [["planner", "From drawings"]] },
-  { key: "schedule", label: "Schedule", icon: CalendarDays, children: [
-      ["roadmap", "Tasks"], ["diary", "Site diary"],
+  { key: "plan", label: "Planning", icon: FileSearch, children: [
+      ["planner", "Read the drawings", "AI reads your plans into packages and costs"],
+      ["roadmap", "Tasks", "the job's task list by stage"],
   ] },
   { key: "money", label: "Money", icon: Wallet, children: [
-      ["budget", "Budget"], ["invoices", "Invoices & claims"], ["variations", "Variations"],
+      ["budget", "Budget", "estimated against committed and paid"],
+      ["invoices", "Invoices & claims", "what is owed and what is claimed"],
+      ["variations", "Variations", "approved changes to the contract"],
   ] },
-  { key: "files", label: "Files", icon: FolderOpen, children: [
-      ["documents", "Documents"], ["overview", "Job details"],
+  { key: "files", label: "Files & records", icon: FolderOpen, children: [
+      ["documents", "Documents", "drawings, permits, certificates"],
+      ["diary", "Site diary & photos", "progress photos and daily notes"],
+      ["overview", "Job details", "client, builder, insurance, dates"],
   ] },
 ];
 
@@ -129,15 +132,12 @@ export default function ProjectDetailPage() {
 
   const area = LEAF_TO_AREA[leaf];
   const activeArea = AREAS.find((a) => a.key === area);
-  const goArea = (a) => setLeaf(a.children[0][0]);
-  const tabCls = (on) =>
-    `px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-      on ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:text-amber-400 hover:bg-slate-800"
-    }`;
+  const activeLeaf = activeArea?.children.find(([k]) => k === leaf);
+  const stage = steps?.current_stage;
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-8" data-testid="project-detail-page">
-      {/* Compact header — the work should be visible without scrolling. */}
+    <main className="max-w-[100rem] mx-auto px-4 sm:px-6 py-6" data-testid="project-detail-page">
+      {/* Header: the job, and what stage it is at, on every screen. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
           <button data-testid="back-to-projects" onClick={() => navigate("/projects")}
@@ -151,16 +151,23 @@ export default function ProjectDetailPage() {
             data-testid="project-status-badge">
             {statusLabel(project.status)}
           </Badge>
+          {stage && (
+            <button type="button" data-testid="header-stage" onClick={() => setLeaf("work")}
+              title="Go to the trade board"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-400 hover:bg-amber-500/20 transition-colors duration-200">
+              <Hammer className="h-3.5 w-3.5" aria-hidden="true" />
+              Stage {stage.n}: {stage.name}
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-400">
+        <div className="flex items-center gap-3 text-xs text-slate-400">
           <QuickUpload projectId={project.id} onUploaded={refresh} />
-          <span className="hidden sm:inline-flex items-center gap-1.5">
+          <span className="hidden lg:inline-flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
             {project.site_suburb} VIC {project.site_postcode}
           </span>
-          <span className="hidden md:inline">{formatAUD(project.contract_value)}</span>
           <span className="flex items-center gap-2">
-            <Progress value={project.progress} className="h-2 w-24 bg-slate-700" />
+            <Progress value={project.progress} className="h-2 w-20 bg-slate-700" />
             <span className="font-heading font-bold text-amber-400 tabular-nums" data-testid="project-overall-progress">
               {project.progress}%
             </span>
@@ -168,34 +175,49 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <nav className="flex flex-wrap items-center gap-1 mb-3" aria-label="Job sections">
-        {AREAS.map((a) => (
-          <button key={a.key} type="button" data-testid={`tab-${a.key}`} onClick={() => goArea(a)}
-            aria-current={area === a.key ? "page" : undefined}
-            className={`${tabCls(area === a.key)} inline-flex items-center gap-2`}>
-            <a.icon className="h-4 w-4" aria-hidden="true" /> {a.label}
-          </button>
-        ))}
-      </nav>
-
-      {activeArea?.children.length > 1 && (
-        <div className="flex flex-wrap gap-1 mb-6 border-b border-slate-800 pb-px"
-          data-testid={`subnav-${activeArea.key}`}>
-          {activeArea.children.map(([l, label]) => (
-            <button key={l} type="button" data-testid={`subtab-${l}`} onClick={() => setLeaf(l)}
-              aria-current={leaf === l ? "page" : undefined}
-              className={`px-3.5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors duration-200 ${
-                leaf === l ? "border-amber-500 text-amber-400"
-                  : "border-transparent text-slate-400 hover:text-slate-200"
-              }`}>
-              {label}
-            </button>
-          ))}
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-7">
+        {/* Phone: one select listing every screen, so nothing is hidden. */}
+        <div className="lg:hidden mb-5">
+          <label htmlFor="job-nav" className="sr-only">Go to</label>
+          <select id="job-nav" data-testid="job-nav-select" value={leaf}
+            onChange={(e) => setLeaf(e.target.value)}
+            className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-slate-100">
+            {AREAS.map((a) => (
+              <optgroup key={a.key} label={a.label}>
+                {a.children.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          {activeLeaf?.[2] && <p className="text-xs text-slate-500 mt-1.5">{activeLeaf[2]}</p>}
         </div>
-      )}
-      {activeArea?.children.length === 1 && <div className="mb-6" />}
 
+        {/* Wide: every destination visible at once, grouped and described. */}
+        <nav className="hidden lg:block sticky top-6 self-start" aria-label="Job sections" data-testid="job-nav">
+          {AREAS.map((a) => (
+            <div key={a.key} className="mb-5">
+              <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5 px-2">
+                <a.icon className="h-3.5 w-3.5" aria-hidden="true" /> {a.label}
+              </p>
+              {a.children.map(([k, label, hint]) => (
+                <button key={k} type="button" data-testid={`nav-${k}`} onClick={() => setLeaf(k)}
+                  aria-current={leaf === k ? "page" : undefined}
+                  className={`block w-full text-left rounded-md px-2.5 py-1.5 mb-0.5 transition-colors duration-200 ${
+                    leaf === k ? "bg-amber-500/15 text-amber-400" : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+                  }`}>
+                  <span className="block text-sm font-medium">{label}</span>
+                  <span className={`block text-[11px] leading-tight ${leaf === k ? "text-amber-400/70" : "text-slate-500"}`}>
+                    {hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        <div className="min-w-0">
       {content}
+        </div>
+      </div>
 
       <ChatPanel projectId={project.id} projectName={project.name} />
     </main>

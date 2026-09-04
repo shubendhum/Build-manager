@@ -15,6 +15,7 @@ from auth import get_current_user
 from trades import trade_warnings
 from invoices import derive as derive_invoice
 from packages import LIVE_QUOTE_STATUSES, COMMITTED_STATUSES
+import build_sequence
 
 nextsteps_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
@@ -206,4 +207,19 @@ async def next_steps(project_id: str):
         if a["count"]:
             badges[a["tab"]] = badges.get(a["tab"], 0) + a["count"]
 
-    return {"project_id": project_id, "actions": actions, "done": done, "badges": badges}
+    # The current stage rides along here because this endpoint is fetched on
+    # every screen — the header can then show it everywhere without a second call.
+    current_stage = None
+    if packages:
+        settled = {"awarded", "ordered", "in-progress", "complete"}
+        placed = [(build_sequence.step_for(p["title"], p.get("trade_type")), p)
+                  for p in packages if p["status"] not in settled]
+        if placed:
+            n, _ = min(placed, key=lambda x: x[0])
+            step = build_sequence.BY_NUMBER.get(n)
+            if step:
+                current_stage = {"n": step["n"], "key": step["key"], "name": step["name"],
+                                 "of": len(build_sequence.SEQUENCE)}
+
+    return {"project_id": project_id, "actions": actions, "done": done, "badges": badges,
+            "current_stage": current_stage}
