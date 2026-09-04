@@ -316,6 +316,25 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
     )
 
     if not verdict["is_quote"]:
+        # The price and the document can arrive in different messages of the
+        # same thread. If this one carries a document and we already hold a
+        # quote for this trade, attach it rather than losing it.
+        if attachment_doc:
+            held = await db.quotes.find_one(
+                {"invitation_id": invitation["id"], "source": "email"},
+                {"_id": 0, "id": 1, "attachment": 1})
+            if held and not (held.get("attachment") or {}).get("file_path"):
+                await db.quotes.update_one({"id": held["id"]},
+                                           {"$set": {"attachment": attachment_doc,
+                                                     "updated_at": now_iso()}})
+                logger.info("Attached %s from a later message to quote %s",
+                            attachment_doc["filename"], held["id"])
+                return {"quote_id": held["id"], "trade_id": invitation["trade_id"],
+                        "priced": False, "kind": verdict["kind"],
+                        "summary": f"Document attached: {attachment_doc['filename']}"}
+            if not held:
+                # Nothing to attach it to yet — leave the file for a later pass.
+                Path(attachment_doc["file_path"]).unlink(missing_ok=True)
         logger.info("Reply from %s classified as %s — no quote raised", sender, verdict["kind"])
         return {"quote_id": None, "trade_id": invitation["trade_id"], "priced": False,
                 "kind": verdict["kind"], "summary": verdict["summary"]}
@@ -420,10 +439,8 @@ async def poll_replies():
                 result = await ingest_reply(rfq, inv, message)
                 if result:
                     ingested.append(result)
-                    # Stop at a real quote; otherwise keep reading this thread,
-                    # since the price may be in a later message.
-                    if result.get("priced"):
-                        break
+                    # Deliberately no break: the rest of the thread may hold the
+                    # document that belongs with this price, or a revision.
 
     await gmail.save_integration(last_poll_at=now_iso(),
                                  last_error="; ".join(errors)[:300] if errors else None)
