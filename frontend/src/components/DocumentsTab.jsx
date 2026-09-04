@@ -7,6 +7,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { QuickUpload } from "@/components/QuickUpload";
 import api, { formatApiErrorDetail, readBlobError, downloadBlob } from "@/lib/api";
 import { formatDate } from "@/lib/projectUtils";
 

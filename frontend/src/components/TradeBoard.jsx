@@ -457,19 +457,6 @@ export const TradeBoard = ({ projectId, focusPackageId }) => {
 
   useEffect(() => { fetchBoard(); }, [fetchBoard]);
 
-  // Arriving from a checklist item opens that row and scrolls to it.
-  useEffect(() => {
-    if (!focusPackageId || !board) return;
-    setExpanded(focusPackageId);
-    const row = board.rows.find((r) => r.package_id === focusPackageId);
-    if (row && !details[focusPackageId]) loadDetail(row);
-    setTimeout(() => document.getElementById(`row-${focusPackageId}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
-    // details is deliberately absent: re-running on every detail load would
-    // yank the page back to this row while you are reading another.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusPackageId, board, loadDetail]);
-
   const loadDetail = useCallback(async (row) => {
     const [q, r, i] = await Promise.all([
       api.get(`/projects/${projectId}/quotes`),
@@ -487,6 +474,22 @@ export const TradeBoard = ({ projectId, focusPackageId }) => {
       },
     }));
   }, [projectId]);
+
+  // Arriving from a checklist item opens that row and scrolls to it. Declared
+  // after loadDetail deliberately — naming a const in a dependency array before
+  // its declaration is a read in the temporal dead zone, which throws on the
+  // first render and takes the whole page with it.
+  useEffect(() => {
+    if (!focusPackageId || !board) return;
+    setExpanded(focusPackageId);
+    const row = board.rows.find((r) => r.package_id === focusPackageId);
+    if (row && !details[focusPackageId]) loadDetail(row);
+    setTimeout(() => document.getElementById(`row-${focusPackageId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+    // details is deliberately absent: re-running on every detail load would
+    // yank the page back to this row while you are reading another.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPackageId, board, loadDetail]);
 
   const toggle = (row) => {
     const next = expanded === row.package_id ? null : row.package_id;

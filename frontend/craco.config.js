@@ -32,6 +32,17 @@ let webpackConfig = {
       },
     },
   },
+  jest: {
+    configure: {
+      moduleNameMapper: {
+        "^@/(.*)$": "<rootDir>/src/$1",
+        // CRA's jest resolver predates package "exports" subpaths, so
+        // react-router-dom v7's own `react-router/dom` import cannot be found.
+        "^react-router/dom$":
+          "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
+      },
+    },
+  },
   webpack: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
