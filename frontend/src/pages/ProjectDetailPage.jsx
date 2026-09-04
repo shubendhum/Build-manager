@@ -4,6 +4,7 @@ import { ArrowLeft, MapPin, Hammer, FileSearch, CalendarDays, Wallet, FolderOpen
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NextSteps } from "@/components/NextSteps";
+import { QuickUpload } from "@/components/QuickUpload";
 import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { PlannerTab } from "@/components/PlannerTab";
@@ -151,6 +152,7 @@ export default function ProjectDetailPage() {
           </Badge>
         </div>
         <div className="flex items-center gap-4 text-xs text-slate-400">
+          <QuickUpload projectId={project.id} onUploaded={refresh} />
           <span className="hidden sm:inline-flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
             {project.site_suburb} VIC {project.site_postcode}

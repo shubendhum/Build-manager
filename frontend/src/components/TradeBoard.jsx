@@ -55,6 +55,81 @@ const SummaryBar = ({ totals }) => (
   </div>
 );
 
+const StageTracker = ({ sequence, current, upcoming, onAction, rows }) => {
+  if (!sequence?.length) return null;
+  const done = sequence.filter((s) => s.state === "done").length;
+  const withWork = sequence.filter((s) => s.packages.length > 0);
+
+  return (
+    <section className="rounded-md border border-slate-700 bg-card p-5 mb-5" data-testid="stage-tracker">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-0.5">Where the job is up to</p>
+          <h2 className="font-heading text-lg font-bold text-slate-100" data-testid="current-stage">
+            {current ? `${current.n}. ${current.name}` : "All stages settled"}
+          </h2>
+        </div>
+        <span className="text-xs text-slate-500 tabular-nums">
+          step {current?.n ?? sequence.length} of {sequence.length}
+        </span>
+      </div>
+
+      {current?.detail && <p className="text-xs text-slate-400 mb-1 max-w-3xl">{current.detail}</p>}
+      {current?.note && (
+        <p className="text-xs text-amber-400 mb-3 max-w-3xl" data-testid="stage-note">{current.note}</p>
+      )}
+
+      {/* One tick per step of the build, so the whole sequence is visible at a glance. */}
+      <div className="flex flex-wrap gap-1 mb-3" role="list" aria-label="Build sequence">
+        {sequence.map((s) => (
+          <span key={s.n} role="listitem" title={`${s.n}. ${s.name}`}
+            data-testid={`seq-${s.n}`}
+            className={`h-2 flex-1 min-w-[10px] rounded-sm ${
+              s.state === "done" ? "bg-emerald-500"
+                : s.state === "current" ? "bg-amber-400"
+                  : s.packages.length ? "bg-slate-600" : "bg-slate-800"
+            }`} />
+        ))}
+      </div>
+      <p className="text-[11px] text-slate-500">
+        {done} of {withWork.length} stages with trades on them are settled ·
+        <span className="text-slate-600"> pale ticks are stages with nothing booked yet</span>
+      </p>
+
+      {upcoming?.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-slate-700/70" data-testid="needs-pricing">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">
+            Price these now — longest lead first
+          </p>
+          <div className="space-y-1.5">
+            {upcoming.map((u) => {
+              const row = rows.find((r) => r.package_id === u.package_id);
+              return (
+                <div key={u.package_id} className="flex flex-wrap items-center gap-2 text-xs"
+                  data-testid={`upcoming-${u.package_id}`}>
+                  <span className="text-amber-400 font-medium tabular-nums w-14 shrink-0">
+                    {u.lead_weeks}wk lead
+                  </span>
+                  <span className="text-slate-200 flex-1 min-w-0 break-words">{u.title}</span>
+                  <span className="text-slate-500 hidden sm:inline">step {u.step} · {u.step_name}</span>
+                  {row?.next_action && (
+                    <Button size="sm" variant="outline"
+                      data-testid={`upcoming-action-${u.package_id}`}
+                      onClick={() => onAction(row, row.next_action.id)}
+                      className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs h-7">
+                      {row.next_action.label}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
 const Row = ({ row, expanded, onToggle, onAction, detail }) => {
   const s = STATE[row.state] || STATE["not-engaged"];
   return (
@@ -74,7 +149,9 @@ const Row = ({ row, expanded, onToggle, onAction, detail }) => {
               <span className={`h-2 w-2 rounded-full shrink-0 mt-2 ${s.dot}`} aria-hidden="true" />
               <span className="min-w-0 flex-1">
                 {/* Full name, wrapped — never cut. */}
-                <span className="block text-[15px] font-semibold text-slate-100 leading-snug break-words">{row.title}</span>
+                <span className="block text-[15px] font-semibold text-slate-100 leading-snug break-words">
+                  <span className="text-slate-500 tabular-nums mr-1.5">{row.step}.</span>{row.title}
+                </span>
                 <span className="block text-xs text-slate-400 mt-0.5 break-words">
                   {row.trade_name || tradeTypeLabel(row.trade_type)}
                 </span>
@@ -130,7 +207,9 @@ const Row = ({ row, expanded, onToggle, onAction, detail }) => {
               aria-hidden="true" />
             <span className={`h-2 w-2 rounded-full shrink-0 ${s.dot}`} aria-hidden="true" />
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-slate-100 break-words">{row.title}</span>
+              <span className="block text-sm font-medium text-slate-100 break-words">
+                <span className="text-slate-500 tabular-nums mr-1.5">{row.step}.</span>{row.title}
+              </span>
               <span className="block text-xs text-slate-500 break-words">
                 {row.trade_name || tradeTypeLabel(row.trade_type)}
                 {row.state === "chasing" && ` · ${row.replied}/${row.invited} replied`}
@@ -435,6 +514,8 @@ export const TradeBoard = ({ projectId }) => {
       {!loading && board && (
         <>
           <SummaryBar totals={board.totals} />
+          <StageTracker sequence={board.sequence} current={board.current_step}
+            upcoming={board.needs_pricing_soon} rows={board.rows} onAction={onAction} />
 
           <div className="flex flex-wrap justify-between items-center gap-3 mb-3">
             <p className="text-xs text-slate-500">

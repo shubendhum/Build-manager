@@ -16,6 +16,7 @@ from db import db
 from auth import get_current_user
 from invoices import derive as derive_invoice
 from packages import LIVE_QUOTE_STATUSES, STAGE_ORDER
+import build_sequence
 
 board_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
 
@@ -136,9 +137,16 @@ async def trade_board(project_id: str):
         benchmark = awarded_amount if awarded_amount is not None else (
             min((q["total_inc_gst"] for q in live), default=None))
 
+        step = build_sequence.place(pkg["title"], pkg.get("trade_type"))
         rows.append({
             "package_id": pkg["id"],
             "title": pkg["title"],
+            # Where this sits in the real build order, not the payment stage.
+            "step": step["n"] if step else 99,
+            "step_key": step["key"] if step else None,
+            "step_name": step["name"] if step else "Not in the standard sequence",
+            "step_note": (step or {}).get("note"),
+            "lead_weeks": (step or {}).get("lead_weeks"),
             # Carried so "Get quotes" can prefill the scope the trade will read.
             "scope": pkg.get("scope", ""),
             "trade_type": pkg.get("trade_type"),
@@ -174,14 +182,50 @@ async def trade_board(project_id: str):
             "variance_vs_estimate": _money(benchmark - estimate) if benchmark and estimate else None,
         })
 
-    rows.sort(key=lambda r: (STATE_RANK.get(r["state"], 9),
-                             STAGE_ORDER.get(r["stage_key"], 99),
-                             r["sort_order"]))
+    # Build order first — a builder reads the job as a sequence, and a row that
+    # needs attention is only useful in the context of when it happens. Within a
+    # step, whatever needs the user comes first.
+    rows.sort(key=lambda r: (r["step"], STATE_RANK.get(r["state"], 9), r["sort_order"]))
 
     committed = _money(sum(r["awarded_amount"] or 0 for r in rows))
+
+    # Where the job is up to: the earliest step that is not settled. Everything
+    # before it is done or paid; this is what the site is actually on.
+    SETTLED = {"paid", "booked"}
+    outstanding = [r for r in rows if r["state"] not in SETTLED]
+    current = min(outstanding, key=lambda r: r["step"]) if outstanding else None
+    current_step = build_sequence.BY_NUMBER.get(current["step"]) if current else None
+
+    # What has to be priced soon. A package with a long lead — trusses, windows —
+    # needs chasing well before its step comes around.
+    upcoming = [
+        {"package_id": r["package_id"], "title": r["title"], "step": r["step"],
+         "step_name": r["step_name"], "lead_weeks": r["lead_weeks"],
+         "state": r["state"], "note": r["step_note"]}
+        for r in rows
+        if r["state"] in {"not-engaged", "chasing"} and current and r["step"] <= current["step"] + 4
+    ]
+    upcoming.sort(key=lambda u: (-(u["lead_weeks"] or 0), u["step"]))
+
     return {
         "project_id": project_id,
         "rows": rows,
+        "sequence": [
+            {"n": s["n"], "key": s["key"], "name": s["name"],
+             "mandatory": bool(s.get("mandatory")),
+             "packages": [r["package_id"] for r in rows if r["step"] == s["n"]],
+             "state": ("done" if all(r["state"] in SETTLED for r in rows if r["step"] == s["n"])
+                       and any(r["step"] == s["n"] for r in rows)
+                       else "current" if current and s["n"] == current["step"]
+                       else "ahead" if current and s["n"] > current["step"] else "behind")}
+            for s in build_sequence.SEQUENCE
+        ],
+        "current_step": {
+            "n": current_step["n"], "key": current_step["key"], "name": current_step["name"],
+            "detail": current_step["detail"], "note": current_step.get("note"),
+            "mandatory": bool(current_step.get("mandatory")),
+        } if current_step else None,
+        "needs_pricing_soon": upcoming,
         "totals": {
             "estimate": _money(sum(r["estimate_total"] for r in rows)),
             "committed": committed,

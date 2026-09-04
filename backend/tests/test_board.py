@@ -171,10 +171,29 @@ class TestTotals:
         assert b["totals"]["needs_you"] == 1, "the undecided package is the only thing waiting"
         assert next(r for r in b["rows"] if r["package_id"] == pkg)["state"] == "decide"
 
-    def test_rows_sort_actionable_first(self, session, project_id):
-        states = [r["state"] for r in board(session, project_id)["rows"]]
-        assert states[0] == "decide", "what needs you comes first"
-        assert states[-1] == "paid", "finished work sinks"
+    def test_rows_sort_in_build_order(self, session, project_id):
+        """A builder reads the job as a sequence, so the board follows the real
+        construction order rather than putting whatever shouts loudest on top."""
+        steps = [r["step"] for r in board(session, project_id)["rows"]]
+        assert steps == sorted(steps), "rows must run in build order"
+
+    def test_every_row_is_placed_in_the_sequence(self, session, project_id):
+        for r in board(session, project_id)["rows"]:
+            assert r["step_name"], f"{r['title']} has no place in the sequence"
+            assert 1 <= r["step"] <= 99
+
+    def test_tracker_reports_the_current_stage(self, session, project_id):
+        b = board(session, project_id)
+        assert len(b["sequence"]) == 25, "the full Victorian sequence"
+        assert any(s["mandatory"] for s in b["sequence"]), "inspections are flagged"
+        if b["current_step"]:
+            unsettled = [r["step"] for r in b["rows"] if r["state"] not in {"paid", "booked"}]
+            assert b["current_step"]["n"] == min(unsettled), \
+                "the current stage is the earliest step still outstanding"
+
+    def test_long_lead_items_are_chased_first(self, session, project_id):
+        leads = [u["lead_weeks"] or 0 for u in board(session, project_id)["needs_pricing_soon"]]
+        assert leads == sorted(leads, reverse=True), "longest lead time first"
 
     def test_unknown_project_404(self, session):
         assert session.get(f"{API}/projects/{uuid.uuid4()}/board", timeout=T).status_code == 404
