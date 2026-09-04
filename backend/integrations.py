@@ -70,12 +70,20 @@ MIN_DOCUMENT_BYTES = 40 * 1024
 
 
 def looks_like_signature(att: dict) -> bool:
+    """Only images can be signature logos.
+
+    `inline` on its own is not enough to disqualify something: several mail
+    clients mark genuine attachments inline, and a 1.1 MB marked-up plan sent
+    that way is still the document you asked for. A PDF is never a signature.
+    """
+    if not att.get("media_type", "").startswith("image/"):
+        return False
     if att.get("inline"):
         return True
     if SIGNATURE_NAME.match(att.get("filename", "")):
         return True
     # A genuine scanned or photographed quote is not 12 KB.
-    return att.get("media_type", "").startswith("image/") and att.get("size", 0) < MIN_DOCUMENT_BYTES
+    return att.get("size", 0) < MIN_DOCUMENT_BYTES
 
 
 def pick_quote_attachment(attachments: list) -> Optional[dict]:
@@ -257,140 +265,126 @@ async def read_reply(subject: str, sender: str, body_text: str,
     }
 
 
-async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[dict]:
-    """Read one reply and record it. Creates a quote only if it IS one.
+async def ingest_thread(rfq: dict, invitation: dict, messages: list) -> Optional[dict]:
+    """Read every unseen message on one invitation and record the outcome once.
 
-    Everything else — questions, acknowledgements, bounces, forwards — is noted
-    against the invitation so the builder can see it, and the invitation stays
-    open so a real price arriving later is still picked up.
+    A tradie's price and their PDF often arrive in different messages, in either
+    order, so the whole thread is considered together rather than each message
+    on its own.
     """
-    payload = message.get("payload", {})
-    body_text = gmail.plain_body(payload)
-    sender = gmail.header(payload, "From")
-    subject = gmail.header(payload, "Subject")
-
-    # Skip anything the builder's own mailbox sent — replies they wrote, and the
-    # request itself. Previously only the one original message id was excluded,
-    # so every later message in the thread became another quote.
     integration = await gmail.get_integration() or {}
     own = [a for a in (integration.get("email_address"), gmail.send_as()) if a]
-    if any(addr.lower() in sender.lower() for addr in own):
+
+    best_doc = None          # the strongest candidate document across the thread
+    best_doc_raw = None
+    priced = None            # the most recent message that actually states a price
+    last_other = None        # what to report when nothing is a quote
+
+    for message in messages:
+        payload = message.get("payload", {})
+        sender = gmail.header(payload, "From")
+        if any(addr.lower() in sender.lower() for addr in own):
+            continue         # the builder's own mail, including the request itself
+
+        subject = gmail.header(payload, "Subject")
+        body_text = gmail.plain_body(payload)
+
+        chosen = pick_quote_attachment(gmail.attachments_in(payload))
+        raw, media_type = None, ""
+        if chosen:
+            try:
+                raw = await gmail.download_attachment(message["id"], chosen["attachment_id"])
+                media_type = chosen["media_type"]
+            except RuntimeError as exc:
+                logger.warning("Attachment download failed: %s", exc)
+                raw, chosen = None, None
+
+        verdict = await read_reply(subject, sender, body_text, raw, media_type)
+
+        # Keep the best document seen anywhere in the thread — a PDF named
+        # "quote" beats a photo, and either beats nothing.
+        if chosen and raw and (best_doc is None or
+                               pick_quote_attachment([chosen, best_doc])["filename"] == chosen["filename"]):
+            best_doc, best_doc_raw = chosen, raw
+
+        if verdict["is_quote"]:
+            priced = {"verdict": verdict, "sender": sender, "subject": subject, "body": body_text}
+        else:
+            last_other = {"verdict": verdict, "sender": sender}
+
+    if not priced and not last_other and best_doc is None:
         return None
 
-    chosen = pick_quote_attachment(gmail.attachments_in(payload))
-    raw, media_type = None, ""
-    attachment_doc, rejected_attachment = None, None
-    if chosen:
-        try:
-            raw = await gmail.download_attachment(message["id"], chosen["attachment_id"])
-            media_type = chosen["media_type"]
-        except RuntimeError as exc:
-            logger.warning("Attachment download failed: %s", exc)
-            raw = None
-
-    verdict = await read_reply(subject, sender, body_text, raw, media_type)
-
-    quote_id = str(uuid.uuid4())
-    if raw and chosen:
-        # Scanned before it touches disk — this file came from outside.
-        scan = await antivirus.check_incoming(raw, media_type, chosen["filename"])
-        if scan.safe_to_store:
-            suffix = Path(chosen["filename"]).suffix or ".pdf"
-            path = QUOTE_UPLOAD_DIR / f"{quote_id}{suffix}"
-            path.write_bytes(raw)
-            attachment_doc = {"filename": chosen["filename"], "file_path": str(path),
-                              "media_type": media_type, "file_size": len(raw),
-                              "scan": scan.model_dump()}
-        else:
-            logger.warning("Attachment %s not stored: %s", chosen["filename"], scan.status)
-            rejected_attachment = {"filename": chosen["filename"], "media_type": media_type,
-                                   "scan": scan.model_dump()}
-
-    # Always record what came back, quote or not.
+    # Record what came back either way.
+    kind = (priced or last_other or {}).get("verdict", {}).get("kind", "other")
+    summary = (priced or last_other or {}).get("verdict", {}).get("summary", "")
     await db.rfqs.update_one(
         {"id": rfq["id"], "invitations.id": invitation["id"]},
         {"$set": {"invitations.$.last_reply_at": now_iso(),
-                  "invitations.$.last_reply_kind": verdict["kind"],
-                  "invitations.$.last_reply_summary": verdict["summary"],
+                  "invitations.$.last_reply_kind": kind,
+                  "invitations.$.last_reply_summary": summary,
                   "updated_at": now_iso()}},
     )
 
-    if not verdict["is_quote"]:
-        # The price and the document can arrive in different messages of the
-        # same thread. If this one carries a document and we already hold a
-        # quote for this trade, attach it rather than losing it.
-        if attachment_doc:
-            held = await db.quotes.find_one(
-                {"invitation_id": invitation["id"], "source": "email"},
-                {"_id": 0, "id": 1, "attachment": 1})
-            if held and not (held.get("attachment") or {}).get("file_path"):
-                await db.quotes.update_one({"id": held["id"]},
-                                           {"$set": {"attachment": attachment_doc,
-                                                     "updated_at": now_iso()}})
-                logger.info("Attached %s from a later message to quote %s",
-                            attachment_doc["filename"], held["id"])
-                return {"quote_id": held["id"], "trade_id": invitation["trade_id"],
-                        "priced": False, "kind": verdict["kind"],
-                        "summary": f"Document attached: {attachment_doc['filename']}"}
-            if not held:
-                # Nothing to attach it to yet — leave the file for a later pass.
-                Path(attachment_doc["file_path"]).unlink(missing_ok=True)
-        logger.info("Reply from %s classified as %s — no quote raised", sender, verdict["kind"])
+    if not priced:
+        logger.info("Thread for %s classified as %s — no quote raised", invitation["trade_id"], kind)
         return {"quote_id": None, "trade_id": invitation["trade_id"], "priced": False,
-                "kind": verdict["kind"], "summary": verdict["summary"]}
+                "kind": kind, "summary": summary}
 
+    quote_id = str(uuid.uuid4())
+    attachment_doc, rejected_attachment = None, None
+    if best_doc and best_doc_raw:
+        scan = await antivirus.check_incoming(best_doc_raw, best_doc["media_type"], best_doc["filename"])
+        if scan.safe_to_store:
+            suffix = Path(best_doc["filename"]).suffix or ".pdf"
+            path = QUOTE_UPLOAD_DIR / f"{quote_id}{suffix}"
+            path.write_bytes(best_doc_raw)
+            attachment_doc = {"filename": best_doc["filename"], "file_path": str(path),
+                              "media_type": best_doc["media_type"],
+                              "file_size": len(best_doc_raw), "scan": scan.model_dump()}
+        else:
+            logger.warning("Attachment %s not stored: %s", best_doc["filename"], scan.status)
+            rejected_attachment = {"filename": best_doc["filename"],
+                                   "media_type": best_doc["media_type"], "scan": scan.model_dump()}
+
+    v = priced["verdict"]
     package = await db.work_packages.find_one({"id": rfq.get("package_id")}, {"_id": 0}) or {}
     fields = {
-        "project_id": rfq["project_id"],
-        "package_id": rfq.get("package_id"),
+        "project_id": rfq["project_id"], "package_id": rfq.get("package_id"),
         "trade_id": invitation["trade_id"],
         "work_package": package.get("title") or rfq["scope"].splitlines()[0][:60],
         "stage_key": rfq.get("stage_key", "lockup"),
-        "amount_ex_gst": verdict["amount_ex_gst"] or 0.0,
-        "gst_amount": verdict["gst_amount"] or 0.0,
-        "total_inc_gst": verdict["total_inc_gst"] or 0.0,
+        "amount_ex_gst": v["amount_ex_gst"] or 0.0, "gst_amount": v["gst_amount"] or 0.0,
+        "total_inc_gst": v["total_inc_gst"] or 0.0,
         "quote_date": datetime.now(timezone.utc).date().isoformat(),
-        "scope_description": verdict["inclusions"],
-        "exclusions": verdict["exclusions"],
-        "lead_time": verdict["lead_time"],
-        "contact_name": sender[:120],
-        "contact_email": sender[:200],
-        "status": "pending",
-        "source": "email",
-        # A model read this number off their document, so a human confirms it.
-        "needs_review": True,
-        "ai_confidence": verdict["confidence"],
-        "ai_summary": verdict["summary"],
-        "email_subject": subject[:200],
-        "email_body": body_text[:4000],
-        "rfq_id": rfq["id"],
-        "invitation_id": invitation["id"],
-        "attachment": attachment_doc,
-        "rejected_attachment": rejected_attachment,
-        "updated_at": now_iso(),
+        "scope_description": v["inclusions"], "exclusions": v["exclusions"],
+        "lead_time": v["lead_time"],
+        "contact_name": priced["sender"][:120], "contact_email": priced["sender"][:200],
+        "status": "pending", "source": "email",
+        "needs_review": True, "ai_confidence": v["confidence"], "ai_summary": v["summary"],
+        "email_subject": priced["subject"][:200], "email_body": priced["body"][:4000],
+        "rfq_id": rfq["id"], "invitation_id": invitation["id"],
+        "rejected_attachment": rejected_attachment, "updated_at": now_iso(),
     }
+    if attachment_doc:
+        fields["attachment"] = attachment_doc
 
-    # One quote per trade per package. A revised price replaces the earlier read
-    # rather than stacking up another row on the board.
     existing = await db.quotes.find_one(
         {"invitation_id": invitation["id"], "source": "email"}, {"_id": 0, "id": 1, "attachment": 1})
     if existing:
         if attachment_doc and (existing.get("attachment") or {}).get("file_path"):
             Path(existing["attachment"]["file_path"]).unlink(missing_ok=True)
-        elif not attachment_doc:
-            fields.pop("attachment")        # keep the one we already have
         await db.quotes.update_one({"id": existing["id"]}, {"$set": fields})
         quote_id = existing["id"]
     else:
         await db.quotes.insert_one({**fields, "id": quote_id, "expiry_date": None,
-                                    "contact_phone": "", "created_at": now_iso()})
+                                    "contact_phone": "", "attachment": attachment_doc,
+                                    "created_at": now_iso()})
 
     await db.rfqs.update_one(
         {"id": rfq["id"], "invitations.id": invitation["id"]},
-        {"$set": {"invitations.$.status": "submitted",
-                  "invitations.$.submitted_at": now_iso(),
-                  "invitations.$.quote_id": quote_id,
-                  "updated_at": now_iso()}},
+        {"$set": {"invitations.$.status": "submitted", "invitations.$.submitted_at": now_iso(),
+                  "invitations.$.quote_id": quote_id, "updated_at": now_iso()}},
     )
     if rfq.get("package_id"):
         await db.work_packages.update_one(
@@ -398,7 +392,7 @@ async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[d
             {"$set": {"status": "quotes-in", "updated_at": now_iso()}},
         )
     return {"quote_id": quote_id, "trade_id": invitation["trade_id"], "priced": True,
-            "kind": verdict["kind"], "total_inc_gst": verdict["total_inc_gst"],
+            "kind": v["kind"], "total_inc_gst": v["total_inc_gst"],
             "had_attachment": attachment_doc is not None}
 
 
@@ -428,19 +422,22 @@ async def poll_replies():
             except RuntimeError as exc:
                 errors.append(str(exc))
                 continue
+            fresh = []
             for message in thread.get("messages", []):
                 if message.get("id") == inv.get("gmail_message_id"):
                     continue    # our own outgoing message
                 if await db.gmail_messages.find_one({"id": message["id"]}, {"_id": 1}):
-                    continue    # already ingested
+                    continue    # already read
+                fresh.append(message)
+            if not fresh:
+                continue
+            for message in fresh:
                 await db.gmail_messages.insert_one(
                     {"id": message["id"], "thread_id": thread_id, "rfq_id": rfq["id"],
                      "invitation_id": inv["id"], "ingested_at": now_iso()})
-                result = await ingest_reply(rfq, inv, message)
-                if result:
-                    ingested.append(result)
-                    # Deliberately no break: the rest of the thread may hold the
-                    # document that belongs with this price, or a revision.
+            result = await ingest_thread(rfq, inv, fresh)
+            if result:
+                ingested.append(result)
 
     await gmail.save_integration(last_poll_at=now_iso(),
                                  last_error="; ".join(errors)[:300] if errors else None)
