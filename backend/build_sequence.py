@@ -140,6 +140,50 @@ SEQUENCE = [
 # The supervisor's own checklist — permits, hold points, certificates — lives in
 # supervisor.py. This module stays about the order the trades come in.
 
+# How long each step actually takes on site, in working days, and which steps
+# run alongside the one before them rather than after it.
+#
+# Grounded in the published Australian stage ranges for a single-storey
+# slab-on-ground: base 1–3 weeks, frame 2–4, lock-up 2–4, fixing 4–8,
+# completion 2–4 — 19–35 weeks of active work. These sum to 25 weeks, which is
+# mid-range, and they are a planning default a builder is expected to override
+# per job rather than a promise.
+DURATIONS = {
+    "pre-start":            (10, False),
+    "site-cut":             (5,  False),
+    "underground-plumbing": (3,  False),
+    "slab-prep":            (5,  False),
+    "pre-slab-inspection":  (2,  False),   # booking and attending, not work
+    "slab-pour":            (7,  False),   # pour, then cure before the frame goes on
+    "wall-frames":          (5,  False),
+    "roof-trusses":         (3,  False),
+    "frame-inspection":     (2,  False),
+    "roofing":              (5,  False),
+    "wrap-windows":         (4,  False),
+    "cladding":             (12, False),   # brickwork is the long pole at lock-up
+    "plumbing-rough-in":    (4,  False),
+    "electrical-rough-in":  (4,  True),    # same walls, same week
+    "insulation":           (2,  False),
+    "plaster":              (8,  False),
+    "waterproof-tiling":    (8,  False),
+    "internal-fixing":      (8,  False),
+    "painting":             (8,  False),
+    "electrical-fit-off":   (3,  False),
+    "plumbing-fit-off":     (3,  True),
+    "final-finishes":       (6,  False),
+    "external-works":       (10, True),    # runs while the inside is finished
+    "defects-clean":        (5,  False),
+    "occupancy":            (10, False),   # surveyor, then the permit itself
+}
+
+for _s in SEQUENCE:
+    _days, _parallel = DURATIONS[_s["key"]]
+    _s["days"] = _days
+    _s["parallel"] = _parallel
+
+# The on-site length of a job, ignoring waits for permits and materials.
+BUILD_DAYS = sum(s["days"] for s in SEQUENCE if not s["parallel"])
+
 BY_KEY = {s["key"]: s for s in SEQUENCE}
 BY_NUMBER = {s["n"]: s for s in SEQUENCE}
 SEQUENCE_KEYS = set(BY_KEY)

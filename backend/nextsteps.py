@@ -16,6 +16,7 @@ from trades import trade_warnings
 from invoices import derive as derive_invoice
 from packages import LIVE_QUOTE_STATUSES, COMMITTED_STATUSES
 from steps import list_steps
+from timeline import get_timeline
 import build_sequence
 
 nextsteps_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_user)])
@@ -194,6 +195,31 @@ async def next_steps(project_id: str):
             "checklist-lead-time", "decision",
             f"{len(early)} thing{'' if len(early) == 1 else 's'} to start now, not later",
             f"{early[0]['name']} — {early[0]['why']}", "steps", len(early)))
+
+    # ---- 7. Materials -----------------------------------------------------
+    # A ten-week lead time falls due long before anyone is on site, so an order
+    # date that has passed is the most expensive thing on this list.
+    plan = await get_timeline(project_id)
+    late_orders = [o for o in plan["orders"] if o["status"] == "overdue"]
+    if late_orders:
+        actions.append(_action(
+            "orders-overdue", "urgent",
+            f"{len(late_orders)} material order{'' if len(late_orders) == 1 else 's'} past its date",
+            f"{late_orders[0]['name']} — {abs(late_orders[0]['days_left'])} days ago",
+            "timeline", len(late_orders)))
+
+    order_now = [o for o in plan["orders"] if o["status"] == "order-now"]
+    if order_now:
+        actions.append(_action(
+            "orders-now", "decision",
+            f"{len(order_now)} thing{'' if len(order_now) == 1 else 's'} to order this week",
+            f"{order_now[0]['name']} — {order_now[0]['lead_weeks']} weeks' notice",
+            "timeline", len(order_now)))
+
+    if plan["start_has_passed"]:
+        actions.append(_action(
+            "start-has-passed", "urgent", "The handover date is no longer reachable",
+            f"It needed to start {plan['planned_start']}.", "timeline"))
 
     if checklist["items_done"]:
         done.append(f"{checklist['items_done']} of {checklist['items_total']} checklist items done")

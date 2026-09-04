@@ -65,10 +65,10 @@ PHASES = [
             {"n": 11, "key": "other-services", "kind": "service",
              "name": "Arrange gas, NBN and other services if required"},
             {"n": 12, "key": "long-lead-orders", "kind": "order",
-             "name": "Order long-lead items", "remind_days": 56,
-             "note": "Trusses and windows are made to order. Left late, they hold up the whole job.",
-             "sub": ["Frames and trusses", "Windows", "Bricks or cladding", "Roofing",
-                     "Garage door", "Kitchen and cabinetry", "Heating and cooling", "Appliances"]},
+             "name": "Order long-lead items", "remind_days": 70,
+             "note": "Bricks and cabinetry are the ones that hold a job up. The timeline turns "
+                     "your handover date into an order-by date for each of them.",
+             "sub": None},   # generated from materials.py, below
             {"n": 13, "key": "trade-scopes", "kind": "check",
              "name": "Finalise written scopes and prices with every trade"},
             {"n": 14, "key": "licences-and-insurance", "kind": "insurance",
@@ -627,6 +627,19 @@ FOOTNOTE = ("The building surveyor checks regulatory compliance at nominated sta
             "your quality-control inspector, so keep doing your own detailed checks throughout.")
 
 BY_KEY = {p["key"]: p for p in PHASES}
+
+
+def _fill_material_list():
+    """The long-lead list is generated, so the checklist and the timeline can
+    never disagree about what has to be ordered or how much notice it needs."""
+    import materials
+    item = next(i for i in BY_KEY["a"]["items"] if i["key"] == "long-lead-orders")
+    item["sub"] = [f"{m['name']} — about {m['lead_weeks']} weeks' notice"
+                   for m in sorted(materials.MATERIALS, key=lambda m: -m["lead_weeks"])
+                   if not m.get("after")]
+
+
+_fill_material_list()
 ITEM_COUNT = sum(len(p["items"]) for p in PHASES)
 
 

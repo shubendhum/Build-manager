@@ -31,6 +31,7 @@ from nextsteps import nextsteps_router  # noqa: E402
 from board import board_router  # noqa: E402
 from agent import agent_router  # noqa: E402
 from steps import steps_router  # noqa: E402
+from timeline import timeline_router  # noqa: E402
 from integrations import integrations_router, public_integrations_router, poll_loop  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
 from variations import variations_router  # noqa: E402
@@ -283,6 +284,7 @@ app.include_router(nextsteps_router)
 app.include_router(board_router)
 app.include_router(agent_router)
 app.include_router(steps_router)
+app.include_router(timeline_router)
 app.include_router(integrations_router)
 app.include_router(public_integrations_router)
 app.include_router(rfqs_router)

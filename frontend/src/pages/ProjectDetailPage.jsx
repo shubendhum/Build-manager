@@ -10,6 +10,7 @@ import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { DrawingsTab } from "@/components/DrawingsTab";
 import { MoneyTab } from "@/components/MoneyTab";
+import { TimelineTab } from "@/components/TimelineTab";
 import { PhotosTab } from "@/components/PhotosTab";
 import api from "@/lib/api";
 import { statusLabel, STATUS_STYLES } from "@/lib/projectUtils";
@@ -20,6 +21,7 @@ import { statusLabel, STATUS_STYLES } from "@/lib/projectUtils";
 const SCREENS = [
   ["work", "Board", "every trade: who is asked, what they quoted, when they are on site"],
   ["steps", "My checklist", "permits, hold points, inspections and certificates"],
+  ["timeline", "Timeline", "planned back from handover, and what to order when"],
   ["drawings", "Drawings & files", "read the plans, and everything filed on this job"],
   ["money", "Money", "estimate, budget, invoices, claims and variations"],
   ["diary", "Site diary", "progress photos and daily notes"],
@@ -98,6 +100,7 @@ export default function ProjectDetailPage() {
       </>
     ),
     steps: <BuildStepsTab projectId={project.id} onGoToBoard={goToBoard} />,
+    timeline: <TimelineTab project={project} onChanged={refresh} />,
     drawings: <DrawingsTab project={project} onChanged={refresh} />,
     money: <MoneyTab project={project} />,
     diary: <PhotosTab project={project} />,

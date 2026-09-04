@@ -136,6 +136,6 @@ class TestShape:
 
     def test_every_action_points_at_a_real_tab(self, session, project_id):
         # The six screens a job actually has, after the merge.
-        valid = {"work", "steps", "drawings", "money", "diary", "overview"}
+        valid = {"work", "steps", "timeline", "drawings", "money", "diary", "overview"}
         for a in steps(session, project_id)["actions"]:
             assert a["tab"] in valid, f"{a['id']} points at unknown tab {a['tab']}"

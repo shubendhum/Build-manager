@@ -257,9 +257,11 @@ class TestOneSourceOfTruth:
     def test_no_next_step_points_at_a_screen_that_was_merged_away(self, session, project_id):
         gone = {"packages", "quotes", "trades", "planner", "documents",
                 "budget", "invoices", "variations", "roadmap"}
+        live = {"work", "steps", "timeline", "drawings", "money", "diary", "overview"}
         d = session.get(f"{API}/projects/{project_id}/next-steps", timeout=60).json()
         for a in d["actions"]:
             assert a["tab"] not in gone, f"{a['id']} still points at {a['tab']}"
+            assert a["tab"] in live, f"{a['id']} points at unknown tab {a['tab']}"
 
     def test_the_board_carries_the_coverage_the_packages_screen_held(self, session, project_id):
         t = session.get(f"{API}/projects/{project_id}/board", timeout=60).json()["totals"]
@@ -381,3 +383,90 @@ class TestChecklistMeetsBoard:
                 f"unplaced packages piled up at step 1: {at_one}"
         finally:
             session.delete(f"{API}/projects/{made}", timeout=60)
+
+
+class TestTimeline:
+    """Planning backwards from handover, and the order-by dates that fall out."""
+
+    def test_the_sequence_carries_a_duration_for_every_step(self):
+        import build_sequence
+        for s in build_sequence.SEQUENCE:
+            assert s["days"] >= 1, f"{s['key']} has no duration"
+            assert isinstance(s["parallel"], bool)
+        # A single-storey slab-on-ground runs 19–35 weeks of active work.
+        assert 19 * 5 <= build_sequence.BUILD_DAYS <= 35 * 5
+
+    def test_working_days_skip_weekends_and_victorian_holidays(self):
+        from datetime import date
+        from timeline import add_working_days, sub_working_days, is_working_day
+        assert not is_working_day(date(2026, 1, 1)), "New Year's Day"
+        assert not is_working_day(date(2026, 4, 25)), "ANZAC Day"
+        assert not is_working_day(date(2026, 11, 3)), "Melbourne Cup"
+        # Friday + 1 working day is Monday.
+        assert add_working_days(date(2026, 9, 4), 1) == date(2026, 9, 7)
+        assert sub_working_days(date(2026, 9, 7), 1) == date(2026, 9, 4)
+
+    def test_backwards_and_forwards_agree(self):
+        """Planning back from a finish must give the same span as planning
+        forward from the start it produces."""
+        from datetime import date
+        from timeline import plan_backwards, plan_forwards
+        back = plan_backwards(date(2027, 6, 30))
+        fwd = plan_forwards(back[0]["start"])
+        assert fwd[-1]["finish"] == back[-1]["finish"]
+
+    def test_every_material_is_ordered_before_it_is_needed(self, session, project_id):
+        from datetime import date
+        session.put(f"{API}/projects/{project_id}",
+                    json={"target_completion": (date.today() + timedelta(days=400)).isoformat()},
+                    timeout=60)
+        d = session.get(f"{API}/projects/{project_id}/timeline", timeout=60).json()
+        assert d["orders"], "there are materials to order"
+        for o in d["orders"]:
+            assert o["order_by"] < o["needed_by"], f"{o['name']} is ordered after it is needed"
+            assert o["lead_weeks"] >= 1
+
+    def test_the_longest_lead_item_is_ordered_first(self, session, project_id):
+        d = session.get(f"{API}/projects/{project_id}/timeline", timeout=60).json()
+        orderable = [o for o in d["orders"] if not o["measured_on_site"]]
+        dates = [o["order_by"] for o in orderable]
+        assert dates == sorted(dates), "order-by dates must run in order"
+
+    def test_a_measured_item_is_never_reported_as_late_to_order(self, session, project_id):
+        d = session.get(f"{API}/projects/{project_id}/timeline", timeout=60).json()
+        for o in d["orders"]:
+            if o["measured_on_site"]:
+                assert o["status"] == "sequenced", \
+                    f"{o['name']} is templated off finished work — it cannot be ordered ahead"
+
+    def test_an_unreachable_handover_date_says_so(self, session, project_id):
+        from datetime import date
+        soon = (date.today() + timedelta(days=30)).isoformat()
+        session.put(f"{API}/projects/{project_id}", json={"target_completion": soon}, timeout=60)
+        d = session.get(f"{API}/projects/{project_id}/timeline", timeout=60).json()
+        assert d["start_has_passed"], "30 days is not 25 weeks"
+        assert d["planned_start"] < d["today"]
+
+    def test_a_material_can_be_priced_separately(self, session, project_id):
+        r = session.post(f"{API}/projects/{project_id}/material-orders",
+                         json={"keys": ["frames-trusses"]}, timeout=60)
+        assert r.status_code == 200, r.text
+        assert r.json()["created"][0]["title"] == "Supply: Frames and trusses"
+
+        d = session.get(f"{API}/projects/{project_id}/timeline", timeout=60).json()
+        frames = next(o for o in d["orders"] if o["key"] == "frames-trusses")
+        assert frames["supply_package"], "the supply package must attach to its material"
+
+        again = session.post(f"{API}/projects/{project_id}/material-orders",
+                             json={"keys": ["frames-trusses"]}, timeout=60)
+        assert again.status_code == 400, "already priced separately"
+
+    def test_the_checklist_long_lead_list_comes_from_the_materials(self):
+        import materials
+        item = next(i for p in supervisor.PHASES for i in p["items"]
+                    if i["key"] == "long-lead-orders")
+        assert len(item["sub"]) == len([m for m in materials.MATERIALS if not m.get("after")])
+        assert "Bricks" in item["sub"][0], "longest lead time is listed first"
+
+    def test_unknown_project_404(self, session):
+        assert session.get(f"{API}/projects/nope/timeline", timeout=60).status_code == 404
