@@ -29,6 +29,7 @@ from quotes import quotes_router  # noqa: E402
 from packages import packages_router  # noqa: E402
 from nextsteps import nextsteps_router  # noqa: E402
 from board import board_router  # noqa: E402
+from agent import agent_router  # noqa: E402
 from integrations import integrations_router, public_integrations_router, poll_loop  # noqa: E402
 from rfqs import rfqs_router, public_rfqs_router  # noqa: E402
 from variations import variations_router  # noqa: E402
@@ -279,6 +280,7 @@ app.include_router(quotes_router)
 app.include_router(packages_router)
 app.include_router(nextsteps_router)
 app.include_router(board_router)
+app.include_router(agent_router)
 app.include_router(integrations_router)
 app.include_router(public_integrations_router)
 app.include_router(rfqs_router)

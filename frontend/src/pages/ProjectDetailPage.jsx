@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NextSteps } from "@/components/NextSteps";
 import { QuickUpload } from "@/components/QuickUpload";
+import { ChatPanel } from "@/components/ChatPanel";
 import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
 import { PlannerTab } from "@/components/PlannerTab";
@@ -195,6 +196,8 @@ export default function ProjectDetailPage() {
       {activeArea?.children.length === 1 && <div className="mb-6" />}
 
       {content}
+
+      <ChatPanel projectId={project.id} projectName={project.name} />
     </main>
   );
 }
