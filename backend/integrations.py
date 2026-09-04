@@ -9,6 +9,7 @@ Collections: integrations, gmail_messages (replies already ingested)
 """
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,15 +38,62 @@ QUOTE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 READABLE_ATTACHMENTS = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
 
-EXTRACT_PROMPT = (
-    "This is a quote from a building subcontractor. Extract the commercial terms.\n"
-    "Reply with ONLY a JSON object, no commentary:\n"
-    '{"amount_ex_gst": number or null, "gst_amount": number or null, '
-    '"total_inc_gst": number or null, "lead_time": "string or null", '
-    '"inclusions": "one or two sentences or null", "exclusions": "one or two sentences or null"}\n'
-    "Amounts are Australian dollars. If only one total is shown and it says it includes GST, "
-    "put it in total_inc_gst and leave the others null. Never guess a number that is not there."
+# Classification comes first. Most replies in a quote thread are not quotes —
+# they are questions, acknowledgements, out-of-office notices, bounces and
+# forwards — and treating those as prices produced a board full of $0 rows.
+CLASSIFY_PROMPT = (
+    "You are reading a reply to a request for quote sent by a builder to a subcontractor.\n"
+    "Decide what this message is, and if it is a quote, extract the commercial terms.\n\n"
+    "Reply with ONLY a JSON object:\n"
+    '{"kind": "quote" | "question" | "acknowledgement" | "decline" | "out-of-office" '
+    '| "bounce" | "other",\n'
+    ' "is_quote": true | false,\n'
+    ' "confidence": "high" | "medium" | "low",\n'
+    ' "amount_ex_gst": number or null, "gst_amount": number or null,\n'
+    ' "total_inc_gst": number or null,\n'
+    ' "lead_time": string or null, "inclusions": string or null,\n'
+    ' "exclusions": string or null,\n'
+    ' "summary": "one short sentence describing the reply"}\n\n'
+    "Rules:\n"
+    "- is_quote is true ONLY when the message or its attachment states a price for the works.\n"
+    "- A delivery failure notice, an auto-reply, or a plain acknowledgement is never a quote.\n"
+    "- A message that only forwards the request onward is not a quote.\n"
+    "- Amounts are Australian dollars. Never invent a number that is not there;\n"
+    "  leave it null and set is_quote false.\n"
+    "- If only one total is given and it says it includes GST, put it in total_inc_gst."
 )
+
+# An emailed signature logo is not a quote. Outlook names them image001.png and
+# marks them inline; they are also tiny compared with a real document.
+SIGNATURE_NAME = re.compile(r"^(image|icon|logo|banner|sig)[-_ ]?\d*\.(png|jpe?g|gif|webp)$", re.I)
+MIN_DOCUMENT_BYTES = 40 * 1024
+
+
+def looks_like_signature(att: dict) -> bool:
+    if att.get("inline"):
+        return True
+    if SIGNATURE_NAME.match(att.get("filename", "")):
+        return True
+    # A genuine scanned or photographed quote is not 12 KB.
+    return att.get("media_type", "").startswith("image/") and att.get("size", 0) < MIN_DOCUMENT_BYTES
+
+
+def pick_quote_attachment(attachments: list) -> Optional[dict]:
+    """The one most likely to be the quote itself."""
+    candidates = [a for a in attachments
+                  if a.get("media_type") in READABLE_ATTACHMENTS and not looks_like_signature(a)]
+    if not candidates:
+        return None
+
+    def rank(a):
+        name = a.get("filename", "").lower()
+        return (
+            0 if "quote" in name or "quotation" in name or "estimate" in name else 1,
+            0 if a.get("media_type") == "application/pdf" else 1,
+            -a.get("size", 0),          # bigger is more likely the real document
+        )
+    return sorted(candidates, key=rank)[0]
+
 
 
 def now_iso() -> str:
@@ -146,43 +194,62 @@ async def gmail_callback(code: Optional[str] = Query(None), state: Optional[str]
 
 # ---------- inbound ----------
 
-async def extract_quote_terms(raw: bytes, media_type: str, body_text: str) -> dict:
-    """Read the commercial terms off an attached quote (or the email body)."""
-    content = [text_content(EXTRACT_PROMPT)]
-    try:
-        if media_type == "application/pdf":
-            # Reuse the planner's renderer; first two pages carry the totals.
-            for page_b64 in render_pages(raw, media_type)[:2]:
-                content.append(image_content(page_b64))
-        elif media_type in READABLE_ATTACHMENTS:
-            import base64
-            content.append(image_content(base64.b64encode(raw).decode(), media_type))
-    except Exception:  # noqa: BLE001 — a bad attachment must not stop ingestion
-        logger.warning("Could not render the attachment; falling back to the email text.")
+def _unread(why: str) -> dict:
+    """Same shape as a successful read, so no caller has to guard for it."""
+    return {"kind": "other", "is_quote": False, "confidence": "low", "summary": why[:300],
+            "amount_ex_gst": None, "gst_amount": None, "total_inc_gst": None,
+            "lead_time": "", "inclusions": "", "exclusions": ""}
 
-    if body_text.strip():
-        content.append(text_content(f"The email said:\n{body_text[:2000]}"))
+
+async def read_reply(subject: str, sender: str, body_text: str,
+                     raw: Optional[bytes], media_type: str) -> dict:
+    """Ask the local model what this reply is, and its terms if it is a quote.
+
+    The attachment and the message text go in together — a tradie often writes
+    the price in the email and attaches the formal quote, or the reverse.
+    """
+    content = [text_content(CLASSIFY_PROMPT)]
+    if raw:
+        try:
+            if media_type == "application/pdf":
+                for page_b64 in render_pages(raw, media_type)[:3]:
+                    content.append(image_content(page_b64))
+            elif media_type in READABLE_ATTACHMENTS:
+                import base64
+                content.append(image_content(base64.b64encode(raw).decode(), media_type))
+        except Exception:  # noqa: BLE001 — a bad attachment must not stop the read
+            logger.warning("Could not render the attachment; reading the message text only.")
+
+    content.append(text_content(
+        f"Subject: {subject}\nFrom: {sender}\n\nMessage:\n{(body_text or '')[:4000]}"))
 
     try:
-        reply = await vision_chat(content, max_tokens=600, timeout=120.0)
+        reply = await vision_chat([{"role": "user", "content": content}],
+                                  max_tokens=700, timeout=150.0)
         data = extract_json(reply)
     except (RuntimeError, ValueError) as exc:
-        logger.warning("Quote extraction failed: %s", exc)
-        return {}
+        logger.warning("Reply classification failed: %s", exc)
+        return _unread(f"Could not read: {exc}")
     if not isinstance(data, dict):
-        return {}
+        return _unread("Unreadable model response")
 
     ex = coerce_float(data.get("amount_ex_gst"))
     gst = coerce_float(data.get("gst_amount"))
     total = coerce_float(data.get("total_inc_gst"))
-    # Fill in whichever leg the quote left out, assuming 10% GST.
     if total is None and ex is not None:
         gst = gst if gst is not None else round(ex * 0.10, 2)
         total = round(ex + gst, 2)
     elif ex is None and total is not None:
         ex = round(total / 1.1, 2)
         gst = round(total - ex, 2)
+
+    # A "quote" with no number is not a quote, whatever the model called it.
+    is_quote = bool(data.get("is_quote")) and bool(total)
     return {
+        "kind": str(data.get("kind") or "other")[:40],
+        "is_quote": is_quote,
+        "confidence": str(data.get("confidence") or "")[:10],
+        "summary": str(data.get("summary") or "").strip()[:300],
         "amount_ex_gst": ex, "gst_amount": gst, "total_inc_gst": total,
         "lead_time": str(data.get("lead_time") or "").strip()[:120],
         "inclusions": str(data.get("inclusions") or "").strip()[:1000],
@@ -191,113 +258,128 @@ async def extract_quote_terms(raw: bytes, media_type: str, body_text: str) -> di
 
 
 async def ingest_reply(rfq: dict, invitation: dict, message: dict) -> Optional[dict]:
-    """Turn one Gmail reply into a draft quote awaiting the builder's confirmation."""
+    """Read one reply and record it. Creates a quote only if it IS one.
+
+    Everything else — questions, acknowledgements, bounces, forwards — is noted
+    against the invitation so the builder can see it, and the invitation stays
+    open so a real price arriving later is still picked up.
+    """
     payload = message.get("payload", {})
     body_text = gmail.plain_body(payload)
     sender = gmail.header(payload, "From")
     subject = gmail.header(payload, "Subject")
 
-    quote_id = str(uuid.uuid4())
-    attachment_doc, terms = None, {}
-    rejected_attachment = None
-    for att in gmail.attachments_in(payload):
-        if att["media_type"] not in READABLE_ATTACHMENTS:
-            continue
+    # Skip anything the builder's own mailbox sent — replies they wrote, and the
+    # request itself. Previously only the one original message id was excluded,
+    # so every later message in the thread became another quote.
+    integration = await gmail.get_integration() or {}
+    own = [a for a in (integration.get("email_address"), gmail.send_as()) if a]
+    if any(addr.lower() in sender.lower() for addr in own):
+        return None
+
+    chosen = pick_quote_attachment(gmail.attachments_in(payload))
+    raw, media_type = None, ""
+    attachment_doc, rejected_attachment = None, None
+    if chosen:
         try:
-            raw = await gmail.download_attachment(message["id"], att["attachment_id"])
+            raw = await gmail.download_attachment(message["id"], chosen["attachment_id"])
+            media_type = chosen["media_type"]
         except RuntimeError as exc:
             logger.warning("Attachment download failed: %s", exc)
-            continue
-        # Scanned BEFORE it touches disk. This file came from a stranger, and
-        # once written the app serves it back to the builder on request.
-        verdict = await antivirus.check_incoming(raw, att["media_type"], att["filename"])
-        if not verdict.safe_to_store:
-            logger.warning("Attachment %s not stored: %s (%s)",
-                           att["filename"], verdict.status, verdict.signature or verdict.detail)
-            rejected_attachment = {
-                "filename": att["filename"], "media_type": att["media_type"],
-                "scan": verdict.model_dump(),
-            }
-            # Read the price from memory anyway — the reply is still evidence,
-            # we just refuse to keep the file.
-            terms = await extract_quote_terms(raw, att["media_type"], body_text) \
-                if verdict.status == "unscanned" else {}
-            break
+            raw = None
 
-        suffix = Path(att["filename"]).suffix or ".pdf"
-        path = QUOTE_UPLOAD_DIR / f"{quote_id}{suffix}"
-        path.write_bytes(raw)
-        attachment_doc = {"filename": att["filename"], "file_path": str(path),
-                          "media_type": att["media_type"], "file_size": len(raw),
-                          "scan": verdict.model_dump()}
-        terms = await extract_quote_terms(raw, att["media_type"], body_text)
-        break   # the first readable attachment is the quote
+    verdict = await read_reply(subject, sender, body_text, raw, media_type)
 
-    if not terms:
-        terms = await extract_quote_terms(b"", "", body_text)
+    quote_id = str(uuid.uuid4())
+    if raw and chosen:
+        # Scanned before it touches disk — this file came from outside.
+        scan = await antivirus.check_incoming(raw, media_type, chosen["filename"])
+        if scan.safe_to_store:
+            suffix = Path(chosen["filename"]).suffix or ".pdf"
+            path = QUOTE_UPLOAD_DIR / f"{quote_id}{suffix}"
+            path.write_bytes(raw)
+            attachment_doc = {"filename": chosen["filename"], "file_path": str(path),
+                              "media_type": media_type, "file_size": len(raw),
+                              "scan": scan.model_dump()}
+        else:
+            logger.warning("Attachment %s not stored: %s", chosen["filename"], scan.status)
+            rejected_attachment = {"filename": chosen["filename"], "media_type": media_type,
+                                   "scan": scan.model_dump()}
+
+    # Always record what came back, quote or not.
+    await db.rfqs.update_one(
+        {"id": rfq["id"], "invitations.id": invitation["id"]},
+        {"$set": {"invitations.$.last_reply_at": now_iso(),
+                  "invitations.$.last_reply_kind": verdict["kind"],
+                  "invitations.$.last_reply_summary": verdict["summary"],
+                  "updated_at": now_iso()}},
+    )
+
+    if not verdict["is_quote"]:
+        logger.info("Reply from %s classified as %s — no quote raised", sender, verdict["kind"])
+        return {"quote_id": None, "trade_id": invitation["trade_id"], "priced": False,
+                "kind": verdict["kind"], "summary": verdict["summary"]}
 
     package = await db.work_packages.find_one({"id": rfq.get("package_id")}, {"_id": 0}) or {}
-    total = terms.get("total_inc_gst")
-
-    quote = {
-        "id": quote_id,
+    fields = {
         "project_id": rfq["project_id"],
         "package_id": rfq.get("package_id"),
         "trade_id": invitation["trade_id"],
         "work_package": package.get("title") or rfq["scope"].splitlines()[0][:60],
         "stage_key": rfq.get("stage_key", "lockup"),
-        "amount_ex_gst": terms.get("amount_ex_gst") or 0.0,
-        "gst_amount": terms.get("gst_amount") or 0.0,
-        "total_inc_gst": total or 0.0,
+        "amount_ex_gst": verdict["amount_ex_gst"] or 0.0,
+        "gst_amount": verdict["gst_amount"] or 0.0,
+        "total_inc_gst": verdict["total_inc_gst"] or 0.0,
         "quote_date": datetime.now(timezone.utc).date().isoformat(),
-        "expiry_date": None,
-        "scope_description": terms.get("inclusions", ""),
-        "exclusions": terms.get("exclusions", ""),
-        "lead_time": terms.get("lead_time", ""),
+        "scope_description": verdict["inclusions"],
+        "exclusions": verdict["exclusions"],
+        "lead_time": verdict["lead_time"],
         "contact_name": sender[:120],
-        "contact_phone": "",
         "contact_email": sender[:200],
-        # A quote with no number is not a price to decide on — keep it out of
-        # the live set so the board does not offer to award $0.
-        "status": "pending" if total else "expired",
+        "status": "pending",
         "source": "email",
-        # The price was read by a model, so it must be confirmed before it can
-        # be trusted as a commitment.
+        # A model read this number off their document, so a human confirms it.
         "needs_review": True,
+        "ai_confidence": verdict["confidence"],
+        "ai_summary": verdict["summary"],
         "email_subject": subject[:200],
         "email_body": body_text[:4000],
         "rfq_id": rfq["id"],
         "invitation_id": invitation["id"],
         "attachment": attachment_doc,
-        # Named so the builder knows a file arrived and why it was not kept.
         "rejected_attachment": rejected_attachment,
-        "created_at": now_iso(),
         "updated_at": now_iso(),
     }
-    await db.quotes.insert_one(dict(quote))
 
-    # A reply with no price in it is not a quote — it is a forward, a question or
-    # an acknowledgement. Record it so the builder can read it, but leave the
-    # invitation open so the watcher keeps looking at that thread for a real
-    # price rather than closing the door on it.
-    priced = bool(total)
+    # One quote per trade per package. A revised price replaces the earlier read
+    # rather than stacking up another row on the board.
+    existing = await db.quotes.find_one(
+        {"invitation_id": invitation["id"], "source": "email"}, {"_id": 0, "id": 1, "attachment": 1})
+    if existing:
+        if attachment_doc and (existing.get("attachment") or {}).get("file_path"):
+            Path(existing["attachment"]["file_path"]).unlink(missing_ok=True)
+        elif not attachment_doc:
+            fields.pop("attachment")        # keep the one we already have
+        await db.quotes.update_one({"id": existing["id"]}, {"$set": fields})
+        quote_id = existing["id"]
+    else:
+        await db.quotes.insert_one({**fields, "id": quote_id, "expiry_date": None,
+                                    "contact_phone": "", "created_at": now_iso()})
+
     await db.rfqs.update_one(
         {"id": rfq["id"], "invitations.id": invitation["id"]},
-        {"$set": {
-            "invitations.$.status": "submitted" if priced else invitation.get("status", "sent"),
-            "invitations.$.submitted_at": now_iso() if priced else None,
-            "invitations.$.quote_id": quote_id if priced else None,
-            "invitations.$.last_reply_at": now_iso(),
-            "updated_at": now_iso(),
-        }},
+        {"$set": {"invitations.$.status": "submitted",
+                  "invitations.$.submitted_at": now_iso(),
+                  "invitations.$.quote_id": quote_id,
+                  "updated_at": now_iso()}},
     )
-    if priced and rfq.get("package_id"):
+    if rfq.get("package_id"):
         await db.work_packages.update_one(
             {"id": rfq["package_id"], "status": {"$in": ["draft", "out-for-quote"]}},
             {"$set": {"status": "quotes-in", "updated_at": now_iso()}},
         )
-    return {"quote_id": quote_id, "trade_id": invitation["trade_id"],
-            "total_inc_gst": total, "priced": priced,
+    return {"quote_id": quote_id, "trade_id": invitation["trade_id"], "priced": True,
+            "kind": verdict["kind"], "total_inc_gst": verdict["total_inc_gst"],
             "had_attachment": attachment_doc is not None}
 
 
@@ -338,7 +420,10 @@ async def poll_replies():
                 result = await ingest_reply(rfq, inv, message)
                 if result:
                     ingested.append(result)
-                break   # one reply per invitation is enough to raise a quote
+                    # Stop at a real quote; otherwise keep reading this thread,
+                    # since the price may be in a later message.
+                    if result.get("priced"):
+                        break
 
     await gmail.save_integration(last_poll_at=now_iso(),
                                  last_error="; ".join(errors)[:300] if errors else None)

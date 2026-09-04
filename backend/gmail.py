@@ -344,17 +344,31 @@ def plain_body(payload: dict) -> str:
     return ""
 
 
+def part_header(part: dict, name: str) -> str:
+    for h in part.get("headers", []) or []:
+        if h.get("name", "").lower() == name.lower():
+            return h.get("value", "")
+    return ""
+
+
 def attachments_in(payload: dict) -> list:
+    """Real attachments, with enough context to tell a quote from a logo.
+
+    `inline` matters: a signature image is referenced by the HTML body via
+    Content-ID and is not something the sender meant to send you.
+    """
     found = []
     for part in walk_parts(payload):
         filename = part.get("filename")
         body = part.get("body") or {}
         if filename and body.get("attachmentId"):
+            disposition = part_header(part, "Content-Disposition").lower()
             found.append({
                 "filename": filename,
                 "attachment_id": body["attachmentId"],
                 "media_type": part.get("mimeType", "application/octet-stream"),
                 "size": body.get("size", 0),
+                "inline": "inline" in disposition or bool(part_header(part, "Content-ID")),
             })
     return found
 
