@@ -84,7 +84,8 @@ class TestSequence:
         s = steps(session, project_id)
         send = next(a for a in s["actions"] if a["id"] == "send-packages")
         assert send["count"] == 2
-        assert s["badges"]["packages"] == 2
+        # Packages and quotes are the board now, so the badge lands there.
+        assert s["badges"]["work"] == 2
         assert any("work packages defined" in d for d in s["done"])
 
     def test_quotes_in_becomes_a_decision(self, session, project_id, trades):
@@ -99,7 +100,7 @@ class TestSequence:
         s = steps(session, project_id)
         decide = next(a for a in s["actions"] if a["id"] == "decide-quotes")
         assert decide["count"] == 1 and decide["severity"] == "decision"
-        assert decide["tab"] == "quotes"
+        assert decide["tab"] == "work"
         assert "Plumbing" in decide["detail"]
 
     def test_awarding_clears_the_decision(self, session, project_id):
@@ -134,7 +135,7 @@ class TestShape:
         assert sum(s["badges"].values()) == counted
 
     def test_every_action_points_at_a_real_tab(self, session, project_id):
-        valid = {"overview", "planner", "packages", "trades", "quotes", "steps",
-                 "roadmap", "diary", "budget", "invoices", "variations", "documents"}
+        # The six screens a job actually has, after the merge.
+        valid = {"work", "steps", "drawings", "money", "diary", "overview"}
         for a in steps(session, project_id)["actions"]:
             assert a["tab"] in valid, f"{a['id']} points at unknown tab {a['tab']}"

@@ -24,9 +24,10 @@ def session():
 
 @pytest.fixture(scope="module")
 def project_id(session):
-    r = session.get(f"{API}/projects", timeout=15)
-    p = next(x for x in r.json() if x["name"] == "Residence – Ballarat West")
-    return p["id"]
+    projects = session.get(f"{API}/projects", timeout=15).json()
+    if not projects:
+        pytest.skip("no job to plan against")
+    return projects[0]["id"]
 
 
 class TestPlanValidation:
@@ -72,3 +73,33 @@ class TestPlanValidation:
         r = session.post(f"{API}/plans/not-a-plan/apply",
                          json={"draft_id": "x", "tasks": [], "estimate_lines": []}, timeout=15)
         assert r.status_code == 404
+
+
+class TestAnalyseAFiledDrawing:
+    """The planner used to want its own upload, so a drawing already on the job
+    had to be uploaded a second time just to be read."""
+
+    def test_a_filed_document_is_found_and_read(self, session, project_id):
+        """A text file proves the lookup and the type check both ran against the
+        stored document — without dispatching a real analysis at the model."""
+        r = session.post(f"{API}/projects/{project_id}/documents", timeout=15,
+                         files={"file": ("notes.txt", io.BytesIO(b"site notes"), "text/plain")},
+                         data={"title": "PLANTEST notes", "category": "other"})
+        assert r.status_code in (200, 201), r.text
+        doc_id = r.json()["id"]
+        try:
+            a = session.post(f"{API}/projects/{project_id}/plans/analyze",
+                             data={"document_id": doc_id}, timeout=30)
+            assert a.status_code == 400
+            assert "PDF" in a.json()["detail"]
+        finally:
+            session.delete(f"{API}/documents/{doc_id}", timeout=15)
+
+    def test_a_document_from_another_job_is_refused(self, session, project_id):
+        r = session.post(f"{API}/projects/{project_id}/plans/analyze",
+                         data={"document_id": "not-on-this-job"}, timeout=30)
+        assert r.status_code == 404
+
+    def test_neither_a_file_nor_a_document_is_refused(self, session, project_id):
+        r = session.post(f"{API}/projects/{project_id}/plans/analyze", data={}, timeout=30)
+        assert r.status_code == 400

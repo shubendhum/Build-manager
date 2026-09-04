@@ -24,7 +24,10 @@ const Field = ({ label, children, className = "" }) => (
   </div>
 );
 
-export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, onSaved }) => {
+// `pkg` is the board row a price is being added against. When it is given the
+// package is already known, so the free-text field is replaced by its name and
+// the quote is filed against the package rather than a string that has to match.
+export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, pkg, onSaved }) => {
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const isEdit = Boolean(quote);
@@ -36,9 +39,10 @@ export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, 
         ...EMPTY, ...quote,
         amount_ex_gst: String(quote.amount_ex_gst), gst_amount: String(quote.gst_amount),
         quote_date: quote.quote_date || "", expiry_date: quote.expiry_date || "",
-      } : EMPTY);
+      } : pkg ? { ...EMPTY, work_package: pkg.title, stage_key: pkg.stage_key || EMPTY.stage_key }
+        : EMPTY);
     }
-  }, [open, quote]);
+  }, [open, quote, pkg]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const setVal = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
@@ -57,6 +61,7 @@ export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, 
     try {
       const payload = {
         work_package: form.work_package,
+        package_id: quote?.package_id || pkg?.package_id || null,
         trade_id: form.trade_id,
         stage_key: form.stage_key,
         amount_ex_gst: parseFloat(form.amount_ex_gst) || 0,
@@ -88,8 +93,15 @@ export const QuoteFormDialog = ({ open, onOpenChange, projectId, quote, trades, 
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
           <Field label="Work package *" className="sm:col-span-2">
-            <Input data-testid="quote-form-work-package" required className={fieldCls} value={form.work_package}
-              onChange={set("work_package")} placeholder="e.g. Electrical rough-in + fit-off" />
+            {pkg && !isEdit ? (
+              <p data-testid="quote-form-work-package-fixed"
+                className="text-sm text-slate-200 bg-slate-800/50 border border-slate-600 rounded-md px-3 py-2">
+                {form.work_package}
+              </p>
+            ) : (
+              <Input data-testid="quote-form-work-package" required className={fieldCls} value={form.work_package}
+                onChange={set("work_package")} placeholder="e.g. Electrical rough-in + fit-off" />
+            )}
           </Field>
           <Field label="Trade *">
             <Select value={form.trade_id} onValueChange={setVal("trade_id")}>

@@ -227,3 +227,38 @@ class TestReminderRules:
                               ("b", [("permit", "todo", None, None)]))
         got = _reminders(phases, "a")
         assert [r["phase_key"] for r in got] == ["a"]
+
+
+class TestOneSourceOfTruth:
+    """The screen review found the same thing tracked in two places. These lock
+    the merges in so they cannot quietly come back."""
+
+    def test_mandatory_inspections_live_only_on_the_checklist(self):
+        """They used to be seeded as roadmap tasks as well, so one could be
+        ticked while the other still showed it outstanding."""
+        import roadmap_template
+        seeded = [t for tasks in roadmap_template.ROADMAP_TEMPLATE.values()
+                  for t in tasks if t[2]]
+        assert seeded == [], f"still seeding inspections as tasks: {seeded}"
+        holds = [i for p in supervisor.PHASES for i in p["items"] if i["kind"] == "hold"]
+        assert len(holds) >= 4, "the checklist must carry them instead"
+
+    def test_no_next_step_points_at_a_screen_that_was_merged_away(self, session, project_id):
+        gone = {"packages", "quotes", "trades", "planner", "documents",
+                "budget", "invoices", "variations", "roadmap"}
+        d = session.get(f"{API}/projects/{project_id}/next-steps", timeout=60).json()
+        for a in d["actions"]:
+            assert a["tab"] not in gone, f"{a['id']} still points at {a['tab']}"
+
+    def test_the_board_carries_the_coverage_the_packages_screen_held(self, session, project_id):
+        t = session.get(f"{API}/projects/{project_id}/board", timeout=60).json()["totals"]
+        for k in ("package_count", "priced_count", "committed_count",
+                  "committed", "invoiced", "paid", "outstanding"):
+            assert k in t, f"board totals missing {k}"
+        assert t["priced_count"] <= t["package_count"]
+        assert t["committed_count"] <= t["package_count"]
+
+    def test_the_dashboard_leads_with_hold_points_not_inspection_tasks(self, session):
+        d = session.get(f"{API}/dashboard", timeout=120).json()
+        assert "hold_points" in d and "checklist_overdue" in d
+        assert "inspections" not in d, "the widget that read seeded tasks is gone"

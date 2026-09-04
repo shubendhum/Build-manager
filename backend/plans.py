@@ -13,7 +13,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel
 from PIL import Image
 
@@ -337,25 +337,52 @@ def clean_draft(data: dict, rates: list) -> dict:
 # ---------- Routes ----------
 
 @plans_router.post("/projects/{project_id}/plans/analyze")
-async def analyze_plan(project_id: str, file: UploadFile = File(...)):
+async def analyze_plan(project_id: str, file: Optional[UploadFile] = File(None),
+                       document_id: Optional[str] = Form(None)):
+    """Analyse a drawing.
+
+    Either upload one, or name a document already filed against this job. The
+    second form is the normal one — a drawing gets filed when it arrives, and
+    uploading a second copy just to analyse it left two of everything.
+    """
     if not await db.projects.find_one({"id": project_id}):
         raise HTTPException(status_code=404, detail="Project not found.")
-    if file.content_type not in PLAN_TYPES:
-        raise HTTPException(status_code=400, detail="Upload an architectural drawing as PDF, JPEG or PNG.")
-    raw = await file.read()
+    if not file and not document_id:
+        raise HTTPException(status_code=400, detail="Choose a drawing from this job, or upload one.")
+
+    if document_id:
+        doc_rec = await db.documents.find_one(
+            {"id": document_id, "project_id": project_id}, {"_id": 0})
+        if not doc_rec:
+            raise HTTPException(status_code=404, detail="That document is not on this job.")
+        media_type = doc_rec.get("media_type")
+        if media_type not in PLAN_TYPES:
+            raise HTTPException(status_code=400, detail="That file is not a PDF, JPEG or PNG drawing.")
+        try:
+            raw = Path(doc_rec["file_path"]).read_bytes()
+        except OSError:
+            raise HTTPException(status_code=404, detail="That document's file is missing from disk.")
+        filename = doc_rec.get("filename") or doc_rec.get("title") or "drawing"
+    else:
+        media_type = file.content_type
+        if media_type not in PLAN_TYPES:
+            raise HTTPException(status_code=400, detail="Upload an architectural drawing as PDF, JPEG or PNG.")
+        raw = await file.read()
+        filename = file.filename or "drawing"
+
     if len(raw) == 0:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        raise HTTPException(status_code=400, detail="That file is empty.")
     if len(raw) > MAX_PLAN_BYTES:
-        raise HTTPException(status_code=413, detail="Drawing too large. Maximum upload size is 30 MB.")
+        raise HTTPException(status_code=413, detail="Drawing too large. Maximum size is 30 MB.")
 
     plan_id = str(uuid.uuid4())
-    ext = PLAN_TYPES[file.content_type]
+    ext = PLAN_TYPES[media_type]
     file_path = PLANS_DIR / f"{plan_id}{ext}"
     file_path.write_bytes(raw)
 
     # Count pages for progress tracking (fast, no AI yet)
     try:
-        page_count = len(render_pages(raw, file.content_type))
+        page_count = len(render_pages(raw, media_type))
     except HTTPException:
         raise
     except Exception:
@@ -364,8 +391,9 @@ async def analyze_plan(project_id: str, file: UploadFile = File(...)):
     record = {
         "id": plan_id,
         "project_id": project_id,
-        "filename": file.filename or f"drawing{ext}",
-        "media_type": file.content_type,
+        "document_id": document_id,
+        "filename": filename,
+        "media_type": media_type,
         "page_count": page_count,
         "page_summaries": [],
         "scope": None,

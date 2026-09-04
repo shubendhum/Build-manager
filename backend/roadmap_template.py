@@ -15,6 +15,11 @@ STAGES = [
 STAGE_KEYS = {s["key"] for s in STAGES}
 
 # Each entry: (title, description/compliance note, is_mandatory_inspection)
+#
+# Mandatory inspections are NOT in here. They live on the supervisor checklist
+# (supervisor.py), where they sit next to the permits and certificates and are
+# treated as hold points. Tracking them in two places meant one could be ticked
+# while the other still showed it outstanding — the way a hold point gets missed.
 ROADMAP_TEMPLATE = {
     "pre-construction": [
         ("Confirm builder registration current (DB-U/CDB-U)",
@@ -43,8 +48,6 @@ ROADMAP_TEMPLATE = {
          "Sanitary and stormwater drainage installed and tested before pour.", False),
         ("Termite protection installed",
          "Termite management system installed in accordance with AS 3660.1.", False),
-        ("MANDATORY INSPECTION: Pre-pour footings/slab approval",
-         "RBS must inspect and approve footings/slab steel BEFORE the pour proceeds.", True),
         ("Footings/slab poured",
          "Concrete poured and cured; base stage complete for progress payment purposes.", False),
     ],
@@ -55,8 +58,6 @@ ROADMAP_TEMPLATE = {
          "Trusses installed and fixed per manufacturer layout and tie-down schedule.", False),
         ("Windows/external door frames installed",
          "Window and external door frames fitted within frame.", False),
-        ("MANDATORY INSPECTION: Frame approval",
-         "RBS frame inspection approval required before frame is covered.", True),
     ],
     "lockup": [
         ("Roof covering complete",
@@ -79,8 +80,6 @@ ROADMAP_TEMPLATE = {
          "Kitchen and wet area cabinetry installed.", False),
         ("Waterproofing to wet areas",
          "Wet area waterproofing applied in accordance with AS 3740.", False),
-        ("MANDATORY INSPECTION: Wet area waterproofing approval",
-         "RBS approval of wet area waterproofing where required by the building permit.", True),
         ("Tiling",
          "Wall and floor tiling to wet areas and specified rooms.", False),
         ("Painting",
@@ -91,8 +90,6 @@ ROADMAP_TEMPLATE = {
          "Power points, light fittings, tapware, fixtures and appliances installed and commissioned.", False),
         ("Final finishes & site clean",
          "Final touch-ups, builder's clean and site clear.", False),
-        ("MANDATORY INSPECTION: Final inspection by RBS",
-         "RBS carries out the final mandatory inspection of the completed building work.", True),
         ("Occupancy Permit / Certificate of Final Inspection issued",
          "Issued by the RBS — building cannot be occupied without it (new builds require an Occupancy Permit).", False),
         ("Handover pack to client",

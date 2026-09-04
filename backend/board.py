@@ -235,6 +235,10 @@ async def trade_board(project_id: str):
                                   + sum(i["balance"] for i in unallocated)),
             "unallocated_invoiced": _money(sum(i["total_inc_gst"] for i in unallocated)),
             "package_count": len(rows),
+            # Coverage, so the board answers "how much of this build is priced?"
+            # without a second screen to go and look at.
+            "priced_count": sum(1 for r in rows if r["live_quote_count"] > 0),
+            "committed_count": sum(1 for r in rows if r["awarded_amount"]),
             "needs_you": sum(1 for r in rows if r["state"] in {"decide", "chasing", "invoiced"}),
         },
     }

@@ -11,7 +11,7 @@ const TYPE_META = {
 
 const resultTarget = (r) => {
   if (r.type === "project") return `/projects/${r.id}`;
-  if (r.type === "quote") return `/projects/${r.project_id}?tab=quotes`;
+  if (r.type === "quote") return `/projects/${r.project_id}`;
   return "/trades";
 };
 

@@ -64,14 +64,14 @@ export const ProjectFormDialog = ({ open, onOpenChange, project, onSaved }) => {
           duration: 8000,
           action: {
             label: "Plan with AI →",
-            onClick: () => navigate(`/projects/${data.id}?tab=planner`),
+            onClick: () => navigate(`/projects/${data.id}?tab=drawings`),
           },
         });
       }
       onOpenChange(false);
       onSaved?.(data);
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Failed to save project.");
+      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Could not save that job.");
     } finally {
       setBusy(false);
     }
@@ -82,10 +82,10 @@ export const ProjectFormDialog = ({ open, onOpenChange, project, onSaved }) => {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-slate-700" data-testid="project-form-dialog">
         <DialogHeader>
           <DialogTitle className="font-heading text-xl font-bold text-slate-100">
-            {isEdit ? "Edit Project" : "New Project"}
+            {isEdit ? "Edit job" : "New job"}
           </DialogTitle>
           <DialogDescription className="text-slate-400 text-sm">
-            {isEdit ? "Update project details." : "Creating a project auto-generates its Victorian compliance roadmap."}
+            {isEdit ? "Update the job's details." : "A new job comes with the Victorian payment stages and the full supervisor checklist."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">

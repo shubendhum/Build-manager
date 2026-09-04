@@ -25,10 +25,10 @@ export const ProjectOverview = ({ project, onChanged }) => {
   const handleDelete = async () => {
     try {
       await api.delete(`/projects/${project.id}`);
-      toast.success("Project deleted");
+      toast.success("Job deleted");
       navigate("/projects");
     } catch (e) {
-      toast.error("Failed to delete project.");
+      toast.error("Could not delete that job.");
     }
   };
 
@@ -48,7 +48,7 @@ export const ProjectOverview = ({ project, onChanged }) => {
           </AlertDialogTrigger>
           <AlertDialogContent className="bg-card border-slate-700">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-slate-100">Delete this project?</AlertDialogTitle>
+              <AlertDialogTitle className="text-slate-100">Delete this job?</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-400">
                 This permanently removes the project and its roadmap tasks. Photo analyses are kept but unlinked.
               </AlertDialogDescription>

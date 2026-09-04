@@ -38,13 +38,13 @@ export default function TradesPage() {
     <main className="max-w-7xl mx-auto px-6 py-12" data-testid="trades-page">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Subcontractors</p>
-          <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100">Trades Directory</h1>
-          <p className="text-sm text-slate-400 mt-2">Global directory — assign trades to projects and link them to roadmap tasks.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Your contacts</p>
+          <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100">Tradies</h1>
+          <p className="text-sm text-slate-400 mt-2">Every tradie you work with. Prices they send land on the job you asked from.</p>
         </div>
         <Button data-testid="add-trade-button" onClick={() => { setEditing(null); setFormOpen(true); }}
           className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
-          <Plus className="h-4 w-4" aria-hidden="true" /> Add Trade
+          <Plus className="h-4 w-4" aria-hidden="true" /> Add Tradie
         </Button>
       </div>
 

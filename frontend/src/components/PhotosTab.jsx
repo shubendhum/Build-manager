@@ -238,7 +238,7 @@ export const PhotosTab = ({ project }) => {
       setResult(data);
       setPhotos((p) => [data, ...(p || [])]);
       onClear();
-      toast.success("Photo analysed and saved to the project record.");
+      toast.success("Photo analysed and saved to the job.");
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail));
     } finally {

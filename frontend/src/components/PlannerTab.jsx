@@ -14,6 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { ROADMAP_STAGES, roadmapStageLabel, formatMoney, formatDateTime } from "@/lib/projectUtils";
 import { tradeTypeLabel } from "@/lib/tradeUtils";
@@ -38,64 +39,6 @@ const useStagedProgress = (active, steps) => {
   return steps[idx];
 };
 
-const PlanUploadZone = ({ file, onFileSelected, onClear, disabled }) => {
-  const inputRef = useRef(null);
-  const [dragging, setDragging] = useState(false);
-
-  const handleFile = (f) => {
-    if (!f) return;
-    if (!ACCEPTED.includes(f.type)) {
-      toast.error("Unsupported file. Upload the drawings as PDF, JPEG or PNG.");
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      toast.error("Drawing too large. Maximum size is 30 MB.");
-      return;
-    }
-    onFileSelected(f);
-  };
-
-  if (file) {
-    return (
-      <div className="flex items-center gap-3 rounded-md border border-slate-700 bg-slate-800/50 px-4 py-3" data-testid="plan-file-selected">
-        <DraftingCompass className="h-5 w-5 text-amber-400 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-slate-200 truncate">{file.name}</p>
-          <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-        </div>
-        <button type="button" data-testid="plan-file-clear" onClick={onClear} disabled={disabled}
-          className="shrink-0 inline-flex items-center gap-1 text-xs text-slate-300 hover:text-amber-400 transition-colors duration-200 disabled:opacity-50">
-          <X className="h-3.5 w-3.5" aria-hidden="true" /> Remove
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      data-testid="plan-upload-dropzone"
-      role="button"
-      tabIndex={0}
-      onClick={() => !disabled && inputRef.current?.click()}
-      onKeyDown={(e) => e.key === "Enter" && !disabled && inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); if (!disabled) handleFile(e.dataTransfer.files?.[0]); }}
-      className={`cursor-pointer rounded-md border-2 border-dashed p-10 flex flex-col items-center justify-center gap-3 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-amber-500
-        ${dragging ? "border-amber-500 bg-slate-800/60" : "border-slate-600 bg-slate-800/30 hover:border-amber-500 hover:bg-slate-800/50"}`}
-    >
-      <div className="h-12 w-12 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-        <FileUp className="h-6 w-6 text-amber-400" aria-hidden="true" />
-      </div>
-      <div className="text-center">
-        <p className="text-sm font-medium text-slate-200">Drop the architectural drawings here</p>
-        <p className="text-xs text-slate-400 mt-1">or click to browse — PDF (up to 8 sheets read), JPEG or PNG up to 30 MB</p>
-      </div>
-      <input ref={inputRef} data-testid="plan-file-input" type="file" accept="application/pdf,image/jpeg,image/png"
-        className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-    </div>
-  );
-};
 
 const EditableField = ({ label, value, onChange, type, placeholder }) => {
   const [editing, setEditing] = useState(false);
@@ -324,7 +267,7 @@ const DraftReview = ({ plan, draft, onApplied }) => {
         <ListChecks className="h-5 w-5 text-amber-400" aria-hidden="true" />
         <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Review Build Plan Draft</h3>
       </div>
-      <p className="text-xs text-slate-500 mb-5">Untick anything you don't want, adjust quantities and rates, then apply to the project in one go.</p>
+      <p className="text-xs text-slate-500 mb-5">Untick anything you don't want, adjust quantities and rates, then apply to the job in one go.</p>
 
       {/* Tasks by stage */}
       <h4 className="text-xs uppercase tracking-[0.2em] text-slate-400 font-semibold mb-3">Tasks ({taskCount} selected)</h4>
@@ -498,7 +441,8 @@ const DraftReview = ({ plan, draft, onApplied }) => {
 
 export const PlannerTab = ({ project, onChanged }) => {
   const [plans, setPlans] = useState(null);
-  const [file, setFile] = useState(null);
+  const [drawings, setDrawings] = useState([]);
+  const [docId, setDocId] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [jobStatus, setJobStatus] = useState(null);      // {id, status, step, error}
@@ -517,7 +461,14 @@ export const PlannerTab = ({ project, onChanged }) => {
     }
   }, [project.id]);
 
-  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+  // The drawings already filed on this job are what the planner reads.
+  const fetchDrawings = useCallback(async () => {
+    const { data } = await api.get(`/projects/${project.id}/documents`, { params: { category: "drawings" } });
+    setDrawings(data);
+    setDocId((cur) => cur || data[0]?.id || "");
+  }, [project.id]);
+
+  useEffect(() => { fetchPlans(); fetchDrawings(); }, [fetchPlans, fetchDrawings]);
 
   // Stop polling on unmount
   useEffect(() => {
@@ -540,7 +491,6 @@ export const PlannerTab = ({ project, onChanged }) => {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setAnalyzing(false);
-          setFile(null);
           toast.error(data.job_error || "AI analysis failed — please try again.", { duration: 10000 });
         }
       } catch (e) {
@@ -552,22 +502,22 @@ export const PlannerTab = ({ project, onChanged }) => {
   };
 
   const analyze = async () => {
-    if (!file) return;
+    if (!docId) return;
     setAnalyzing(true);
-    setJobStatus({ id: null, status: "pending", step: "Uploading drawing…", error: null });
+    setJobStatus({ id: null, status: "pending", step: "Reading the drawing…", error: null });
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("document_id", docId);
       const { data } = await api.post(`/projects/${project.id}/plans/analyze`, fd, { timeout: 60000 });
       // Immediate response: {id, job_status: "pending", page_count}
       setJobStatus({ id: data.id, status: "pending", step: "Queued for analysis…", error: null });
-      toast.info("Drawing uploaded — AI analysis started in the background.");
+      toast.info("Reading the drawing — analysis is running in the background.");
       startPolling(data.id);
     } catch (e) {
       setAnalyzing(false);
       setJobStatus(null);
       toast.error(
-        (formatApiErrorDetail(e.response?.data?.detail) || "Failed to upload drawing — please try again."),
+        (formatApiErrorDetail(e.response?.data?.detail) || "Could not read that drawing — please try again."),
         { duration: 10000 },
       );
     }
@@ -603,12 +553,29 @@ export const PlannerTab = ({ project, onChanged }) => {
           <h3 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">AI Build Planner</h3>
         </div>
         <p className="text-xs text-slate-500 mb-4">
-          Upload the architectural drawings and the AI will extract the scope, then draft tasks, trades and a
-          priced estimate from your rate guide — all reviewable before anything touches the project.
+          Pick a drawing from the ones filed on this job and the AI will extract the scope, then draft tasks,
+          trades and a priced estimate from your rate guide — all reviewable before anything touches the job.
         </p>
-        <PlanUploadZone file={file} onFileSelected={setFile} onClear={() => setFile(null)} disabled={analyzing} />
+        {drawings.length === 0 ? (
+          <p className="text-sm text-slate-400" data-testid="planner-no-drawings">
+            No drawings on this job yet. Use Upload in the header — or drop a file anywhere on the page — and
+            file it under Drawings.
+          </p>
+        ) : (
+          <Select value={docId} onValueChange={setDocId}>
+            <SelectTrigger data-testid="plan-document-select"
+              className="w-full sm:w-96 bg-slate-800/50 border-slate-600 text-slate-200">
+              <SelectValue placeholder="Choose a drawing to read" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-slate-700 max-h-64">
+              {drawings.map((d) => (
+                <SelectItem key={d.id} value={d.id}>{d.title || d.filename}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex flex-wrap items-center gap-3 mt-4">
-          <Button data-testid="plan-analyze-button" onClick={analyze} disabled={!file || analyzing}
+          <Button data-testid="plan-analyze-button" onClick={analyze} disabled={!docId || analyzing}
             className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
             {analyzing ? (<><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Analysing…</>) : (<><Sparkles className="h-4 w-4" aria-hidden="true" /> Analyse Drawings</>)}
           </Button>
@@ -631,7 +598,7 @@ export const PlannerTab = ({ project, onChanged }) => {
         <div className="rounded-md border border-dashed border-slate-700 bg-slate-800/20 p-10 text-center" data-testid="planner-empty">
           <DraftingCompass className="h-8 w-8 text-slate-600 mx-auto mb-3" aria-hidden="true" />
           <p className="text-sm text-slate-400 mb-1">No drawings analysed yet.</p>
-          <p className="text-xs text-slate-500">Upload the working drawings above — the AI planner reads floor plans, elevations and site plans.</p>
+          <p className="text-xs text-slate-500">Pick one of your filed drawings above — the planner reads floor plans, elevations and site plans.</p>
         </div>
       )}
 
@@ -679,11 +646,11 @@ export const PlannerTab = ({ project, onChanged }) => {
               <div className="flex flex-wrap gap-3">
                 <Button data-testid="applied-goto-roadmap" variant="outline" size="sm" asChild
                   className="border-slate-600 text-slate-300 hover:text-amber-400 hover:border-amber-500/50">
-                  <Link to={`/projects/${project.id}?tab=roadmap`}>Roadmap <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+                  <Link to={`/projects/${project.id}?tab=money`}>Payment stages <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
                 </Button>
                 <Button data-testid="applied-goto-budget" variant="outline" size="sm" asChild
                   className="border-slate-600 text-slate-300 hover:text-amber-400 hover:border-amber-500/50">
-                  <Link to={`/projects/${project.id}?tab=budget`}>Budget &amp; Estimate <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+                  <Link to={`/projects/${project.id}?tab=money`}>Money <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
                 </Button>
                 <Button data-testid="applied-regenerate" variant="outline" size="sm" onClick={() => generateDraft(plan)} disabled={drafting}
                   className="border-slate-600 text-slate-300 hover:text-amber-400 hover:border-amber-500/50">

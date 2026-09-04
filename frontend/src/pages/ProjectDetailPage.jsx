@@ -1,63 +1,40 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MapPin, Hammer, FileSearch, CalendarDays, Wallet, FolderOpen } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { NextSteps } from "@/components/NextSteps";
 import { QuickUpload } from "@/components/QuickUpload";
 import { ChatPanel } from "@/components/ChatPanel";
 import { BuildStepsTab } from "@/components/BuildStepsTab";
 import { TradeBoard } from "@/components/TradeBoard";
 import { ProjectOverview } from "@/components/ProjectOverview";
-import { PlannerTab } from "@/components/PlannerTab";
-import { RoadmapView } from "@/components/RoadmapView";
-import { ProjectTradesTab } from "@/components/ProjectTradesTab";
-import { PackagesTab } from "@/components/PackagesTab";
-import { QuotesTab } from "@/components/QuotesTab";
-import { InvoicesTab } from "@/components/InvoicesTab";
-import { BudgetTab } from "@/components/BudgetTab";
+import { DrawingsTab } from "@/components/DrawingsTab";
+import { MoneyTab } from "@/components/MoneyTab";
 import { PhotosTab } from "@/components/PhotosTab";
-import { VariationsTab } from "@/components/VariationsTab";
-import { DocumentsTab } from "@/components/DocumentsTab";
 import api from "@/lib/api";
-import { statusLabel, STATUS_STYLES, formatAUD } from "@/lib/projectUtils";
+import { statusLabel, STATUS_STYLES } from "@/lib/projectUtils";
 
-// Tabs with sub-tabs meant you had to click a group to discover what was inside
-// it — you cannot find a screen you do not know exists. Every destination is now
-// listed at once, grouped by heading: a rail on a wide screen, a single select
-// on a phone. Nothing to hunt for.
-const AREAS = [
-  { key: "work", label: "The work", icon: Hammer, children: [
-      ["work", "Trade board", "who is doing what, and where each is up to"],
-      ["steps", "My checklist", "permits, hold points, inspections and certificates"],
-      ["packages", "Packages", "the scopes you send out for quotes"],
-      ["quotes", "Quotes & requests", "prices in, and who you asked"],
-      ["trades", "Tradies on this job", "assigned to this job"],
-  ] },
-  { key: "plan", label: "Planning", icon: FileSearch, children: [
-      ["planner", "Read the drawings", "AI reads your plans into packages and costs"],
-      ["roadmap", "Tasks", "the job's task list by stage"],
-  ] },
-  { key: "money", label: "Money", icon: Wallet, children: [
-      ["budget", "Budget", "estimated against committed and paid"],
-      ["invoices", "Invoices & claims", "what is owed and what is claimed"],
-      ["variations", "Variations", "approved changes to the contract"],
-  ] },
-  { key: "files", label: "Files & records", icon: FolderOpen, children: [
-      ["documents", "Documents", "drawings, permits, certificates"],
-      ["diary", "Site diary & photos", "progress photos and daily notes"],
-      ["overview", "Job details", "client, builder, insurance, dates"],
-  ] },
+// Six screens, flat, all visible at once — a rail on a wide screen, one select
+// on a phone. There were thirteen, and the same trade package appeared on three
+// of them; a screen you can reach three ways is a screen you cannot place.
+const SCREENS = [
+  ["work", "Board", "every trade: who is asked, what they quoted, when they are on site"],
+  ["steps", "My checklist", "permits, hold points, inspections and certificates"],
+  ["drawings", "Drawings & files", "read the plans, and everything filed on this job"],
+  ["money", "Money", "estimate, budget, invoices, claims and variations"],
+  ["diary", "Site diary", "progress photos and daily notes"],
+  ["overview", "Job details", "client, builder, insurance, dates"],
 ];
 
-const LEAF_TO_AREA = {};
-AREAS.forEach((a) => a.children.forEach(([leaf]) => { LEAF_TO_AREA[leaf] = a.key; }));
-const LEAVES = Object.keys(LEAF_TO_AREA);
+// Where the old links land, so a bookmark or an old next-step still works.
+const MOVED = {
+  packages: "work", quotes: "work", trades: "work",
+  planner: "drawings", documents: "drawings",
+  budget: "money", invoices: "money", variations: "money",
+  roadmap: "money",
+};
 
-// Actions the Work board already surfaces on its own rows — don't say it twice.
-const BOARD_COVERS = new Set([
-  "send-packages", "decide-quotes", "chase-trades", "unopened-rfqs", "overdue-invoices",
-]);
+const KEYS = SCREENS.map(([k]) => k);
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
@@ -68,7 +45,7 @@ export default function ProjectDetailPage() {
   const [notFound, setNotFound] = useState(false);
 
   const requested = searchParams.get("tab");
-  const leaf = LEAVES.includes(requested) ? requested : "work";
+  const leaf = KEYS.includes(requested) ? requested : MOVED[requested] || "work";
   const setLeaf = (v) => setSearchParams(v === "work" ? {} : { tab: v }, { replace: true });
 
   const fetchProject = useCallback(async () => {
@@ -97,45 +74,31 @@ export default function ProjectDetailPage() {
   if (notFound) {
     return (
       <main className="max-w-7xl mx-auto px-6 py-12">
-        <p className="text-sm text-slate-400" data-testid="project-not-found">Project not found.</p>
+        <p className="text-sm text-slate-400" data-testid="project-not-found">Job not found.</p>
       </main>
     );
   }
   if (!project) {
-    return <main className="max-w-7xl mx-auto px-6 py-10"><p className="text-sm text-slate-400">Loading project…</p></main>;
+    return <main className="max-w-7xl mx-auto px-6 py-10"><p className="text-sm text-slate-400">Loading the job…</p></main>;
   }
 
-  // On the board, only show steps the board itself can't act on.
-  const boardSteps = steps && {
-    ...steps,
-    actions: steps.actions.filter((a) => !BOARD_COVERS.has(a.id)),
-    done: [],
-  };
-
   const content = {
-    steps: <BuildStepsTab projectId={project.id} />,
+    // "What to do next" is shown once, unfiltered, at the top of the board —
+    // the first thing you should read when you open a job.
     work: (
       <>
-        {boardSteps?.actions.length > 0 && <NextSteps data={boardSteps} onGo={setLeaf} />}
+        {steps?.actions.length > 0 && <NextSteps data={steps} onGo={setLeaf} />}
         <TradeBoard projectId={project.id} />
       </>
     ),
-    planner: <PlannerTab project={project} onChanged={refresh} />,
-    roadmap: <RoadmapView projectId={project.id} onProgressChanged={refresh} />,
-    budget: <BudgetTab project={project} />,
-    overview: <><NextSteps data={steps} onGo={setLeaf} /><ProjectOverview project={project} onChanged={refresh} /></>,
-    quotes: <QuotesTab projectId={project.id} />,
-    invoices: <InvoicesTab projectId={project.id} contractValue={project.contract_value} />,
-    packages: <PackagesTab projectId={project.id} />,
-    trades: <ProjectTradesTab projectId={project.id} />,
-    variations: <VariationsTab projectId={project.id} />,
+    steps: <BuildStepsTab projectId={project.id} />,
+    drawings: <DrawingsTab project={project} onChanged={refresh} />,
+    money: <MoneyTab project={project} />,
     diary: <PhotosTab project={project} />,
-    documents: <DocumentsTab projectId={project.id} />,
+    overview: <ProjectOverview project={project} onChanged={refresh} />,
   }[leaf];
 
-  const area = LEAF_TO_AREA[leaf];
-  const activeArea = AREAS.find((a) => a.key === area);
-  const activeLeaf = activeArea?.children.find(([k]) => k === leaf);
+  const activeScreen = SCREENS.find(([k]) => k === leaf);
   const stage = steps?.current_stage;
 
   return (
@@ -156,10 +119,11 @@ export default function ProjectDetailPage() {
           </Badge>
           {stage && (
             <button type="button" data-testid="header-stage" onClick={() => setLeaf("work")}
-              title="Go to the trade board"
+              title="Go to the board"
               className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-400 hover:bg-amber-500/20 transition-colors duration-200">
-              <Hammer className="h-3.5 w-3.5" aria-hidden="true" />
-              Stage {stage.n}: {stage.name}
+              <span className="tabular-nums">Step {stage.n} of {stage.of}</span>
+              <span className="text-amber-400/70">·</span>
+              {stage.name}
             </button>
           )}
         </div>
@@ -168,12 +132,6 @@ export default function ProjectDetailPage() {
           <span className="hidden lg:inline-flex items-center gap-1.5">
             <MapPin className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
             {project.site_suburb} VIC {project.site_postcode}
-          </span>
-          <span className="flex items-center gap-2">
-            <Progress value={project.progress} className="h-2 w-20 bg-slate-700" />
-            <span className="font-heading font-bold text-amber-400 tabular-nums" data-testid="project-overall-progress">
-              {project.progress}%
-            </span>
           </span>
         </div>
       </div>
@@ -185,35 +143,24 @@ export default function ProjectDetailPage() {
           <select id="job-nav" data-testid="job-nav-select" value={leaf}
             onChange={(e) => setLeaf(e.target.value)}
             className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-slate-100">
-            {AREAS.map((a) => (
-              <optgroup key={a.key} label={a.label}>
-                {a.children.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </optgroup>
-            ))}
+            {SCREENS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
           </select>
-          {activeLeaf?.[2] && <p className="text-xs text-slate-500 mt-1.5">{activeLeaf[2]}</p>}
+          {activeScreen?.[2] && <p className="text-xs text-slate-500 mt-1.5">{activeScreen[2]}</p>}
         </div>
 
         {/* Wide: every destination visible at once, grouped and described. */}
-        <nav className="hidden lg:block sticky top-6 self-start" aria-label="Job sections" data-testid="job-nav">
-          {AREAS.map((a) => (
-            <div key={a.key} className="mb-5">
-              <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5 px-2">
-                <a.icon className="h-3.5 w-3.5" aria-hidden="true" /> {a.label}
-              </p>
-              {a.children.map(([k, label, hint]) => (
-                <button key={k} type="button" data-testid={`nav-${k}`} onClick={() => setLeaf(k)}
-                  aria-current={leaf === k ? "page" : undefined}
-                  className={`block w-full text-left rounded-md px-2.5 py-1.5 mb-0.5 transition-colors duration-200 ${
-                    leaf === k ? "bg-amber-500/15 text-amber-400" : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
-                  }`}>
-                  <span className="block text-sm font-medium">{label}</span>
-                  <span className={`block text-[11px] leading-tight ${leaf === k ? "text-amber-400/70" : "text-slate-500"}`}>
-                    {hint}
-                  </span>
-                </button>
-              ))}
-            </div>
+        <nav className="hidden lg:block sticky top-6 self-start" aria-label="Job screens" data-testid="job-nav">
+          {SCREENS.map(([k, label, hint]) => (
+            <button key={k} type="button" data-testid={`nav-${k}`} onClick={() => setLeaf(k)}
+              aria-current={leaf === k ? "page" : undefined}
+              className={`block w-full text-left rounded-md px-2.5 py-2 mb-1 transition-colors duration-200 ${
+                leaf === k ? "bg-amber-500/15 text-amber-400" : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+              }`}>
+              <span className="block text-sm font-medium">{label}</span>
+              <span className={`block text-[11px] leading-tight ${leaf === k ? "text-amber-400/70" : "text-slate-500"}`}>
+                {hint}
+              </span>
+            </button>
           ))}
         </nav>
 

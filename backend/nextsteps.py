@@ -7,7 +7,7 @@ of actions, each pointing at the tab that resolves it.
 
 Read-only. Every figure comes from the same collections the tabs read.
 """
-from datetime import date, datetime, timezone, timedelta
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 
 from db import db
@@ -22,9 +22,6 @@ nextsteps_router = APIRouter(prefix="/api", dependencies=[Depends(get_current_us
 
 # An invitation that has been sitting unanswered this long is worth chasing.
 CHASE_AFTER_DAYS = 3
-# Inspections this close (or overdue) need booking now.
-INSPECTION_HORIZON_DAYS = 14
-
 # Severity drives colour and ordering: blockers first, then decisions, then setup.
 SEVERITY_RANK = {"urgent": 0, "decision": 1, "todo": 2}
 
@@ -65,7 +62,7 @@ async def next_steps(project_id: str):
     if not has_drawings:
         actions.append(_action(
             "upload-drawings", "todo", "Upload your architect's drawings",
-            "Nothing filed under Drawings yet. Everything else starts here.", "documents"))
+            "Nothing filed under Drawings yet. Everything else starts here.", "drawings"))
     else:
         done.append("Drawings uploaded")
 
@@ -74,11 +71,11 @@ async def next_steps(project_id: str):
     if has_drawings and not plans:
         actions.append(_action(
             "run-planner", "todo", "Run the AI Planner on your drawings",
-            "It reads the sheets and proposes tasks, packages and a cost estimate.", "planner"))
+            "It reads the sheets and proposes tasks, packages and a cost estimate.", "drawings"))
     elif analysed_plan and not applied_plan:
         actions.append(_action(
             "apply-plan", "decision", "Review and apply the draft build plan",
-            "The analysis is finished and waiting for you to approve it.", "planner"))
+            "The analysis is finished and waiting for you to approve it.", "drawings"))
     elif applied_plan:
         done.append("Build plan applied")
 
@@ -92,7 +89,7 @@ async def next_steps(project_id: str):
         if applied_plan or has_drawings:
             actions.append(_action(
                 "create-packages", "todo", "Break the build into work packages",
-                "A package is one scope you can send out for quotes and later award.", "packages"))
+                "A package is one scope you can send out for quotes and later award.", "work"))
     else:
         done.append(f"{len(packages)} work packages defined")
 
@@ -103,7 +100,7 @@ async def next_steps(project_id: str):
                 f"{len(never_sent)} package{'' if len(never_sent) == 1 else 's'} never sent for quote",
                 ", ".join(p["title"] for p in never_sent[:4])
                 + ("…" if len(never_sent) > 4 else ""),
-                "packages", len(never_sent)))
+                "work", len(never_sent)))
 
         # A package with live prices and no award is a decision sitting on you.
         awaiting = [p for p in packages
@@ -114,7 +111,7 @@ async def next_steps(project_id: str):
                 "decide-quotes", "decision",
                 f"{len(awaiting)} package{'' if len(awaiting) == 1 else 's'} have quotes waiting for a decision",
                 ", ".join(p["title"] for p in awaiting[:4]) + ("…" if len(awaiting) > 4 else ""),
-                "quotes", len(awaiting)))
+                "work", len(awaiting)))
 
         awarded = [p for p in packages if p["status"] in COMMITTED_STATUSES]
         if awarded:
@@ -135,7 +132,7 @@ async def next_steps(project_id: str):
             "chase-trades", "decision",
             f"{len(silent)} trade{'' if len(silent) == 1 else 's'} haven't responded",
             f"Longest wait is {oldest} days. Resend from the quote request.",
-            "quotes", len(silent)))
+            "work", len(silent)))
 
     # Trades that opened the link but never priced it are the warmest to chase.
     never_opened = [i for r in rfqs if r.get("status") != "closed"
@@ -147,7 +144,7 @@ async def next_steps(project_id: str):
             "unopened-rfqs", "todo",
             f"{len(never_opened)} quote request{'' if len(never_opened) == 1 else 's'} never opened",
             "They may not have received it — try SMS, or check the address on file.",
-            "quotes", len(never_opened)))
+            "work", len(never_opened)))
 
     # ---- 4. Compliance -------------------------------------------------
     trade_ids = {q["trade_id"] for q in quotes if q.get("trade_id")}
@@ -161,36 +158,9 @@ async def next_steps(project_id: str):
                 "lapsed-cover", "urgent",
                 f"{len(lapsed)} trade{'' if len(lapsed) == 1 else 's'} on this job have lapsed cover",
                 ", ".join(t["business_name"] for t in lapsed[:4]) + ("…" if len(lapsed) > 4 else ""),
-                "trades", len(lapsed)))
+                "work", len(lapsed)))
 
-    # ---- 5. Inspections and overdue work -------------------------------
-    today = date.today()
-    horizon = today + timedelta(days=INSPECTION_HORIZON_DAYS)
-    inspections = []
-    for t in tasks:
-        if not t.get("is_mandatory_inspection") or t.get("status") in {"done", "n-a"}:
-            continue
-        if not t.get("due_date"):
-            continue
-        try:
-            due = date.fromisoformat(t["due_date"])
-        except ValueError:
-            continue
-        if due <= horizon:
-            inspections.append((due, t))
-    if inspections:
-        inspections.sort(key=lambda x: x[0])
-        soonest, task = inspections[0]
-        overdue = soonest < today
-        actions.append(_action(
-            "inspections", "urgent" if overdue else "decision",
-            f"{len(inspections)} mandatory inspection{'' if len(inspections) == 1 else 's'} "
-            + ("overdue" if overdue else "due soon"),
-            f"{task.get('title', 'Inspection')} — "
-            + (f"{(today - soonest).days} days overdue" if overdue else f"due {soonest.strftime('%d/%m/%Y')}"),
-            "roadmap", len(inspections)))
-
-    # ---- 6. Money ------------------------------------------------------
+    # ---- 5. Money ------------------------------------------------------
     derived = [derive_invoice(dict(i)) for i in invoices]
     overdue_invoices = [i for i in derived if i.get("is_overdue")]
     if overdue_invoices:
@@ -198,9 +168,9 @@ async def next_steps(project_id: str):
         actions.append(_action(
             "overdue-invoices", "urgent",
             f"{len(overdue_invoices)} invoice{'' if len(overdue_invoices) == 1 else 's'} overdue",
-            f"${total:,.2f} outstanding past its due date.", "invoices", len(overdue_invoices)))
+            f"${total:,.2f} outstanding past its due date.", "money", len(overdue_invoices)))
 
-    # ---- 7. The supervisor's own checklist ------------------------------
+    # ---- 6. The supervisor's own checklist ------------------------------
     # Permits, hold points and certificates have no package behind them, so
     # without this they are invisible on every screen but their own.
     checklist = await list_steps(project_id)

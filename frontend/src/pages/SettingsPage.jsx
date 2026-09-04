@@ -10,6 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { RateGuide } from "@/components/RateGuide";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { formatDateTime } from "@/lib/projectUtils";
 
@@ -84,9 +85,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-6 py-10" data-testid="settings-page">
+    <main className="max-w-5xl mx-auto px-6 py-10" data-testid="settings-page">
       <h1 className="font-heading text-3xl font-bold tracking-tight text-slate-100 mb-1">Settings</h1>
-      <p className="text-sm text-slate-400 mb-8">Connect the services BuildManager sends and receives through.</p>
+      <p className="text-sm text-slate-400 mb-8">
+        The services BuildManager sends and receives through, and the rates it prices from.
+      </p>
 
       <section className="rounded-md border border-slate-700 bg-card" data-testid="gmail-card">
         <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-700">
@@ -195,6 +198,10 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      <div className="mt-10 pt-10 border-t border-slate-800">
+        <RateGuide />
+      </div>
     </main>
   );
 }

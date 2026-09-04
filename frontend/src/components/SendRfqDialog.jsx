@@ -148,7 +148,7 @@ export const SendRfqDialog = ({ open, onOpenChange, projectId, pkg, trades, docu
           <DialogDescription className="text-slate-400 text-sm">
             {step === 1 && "Pick every trade you want to price this package. Each one gets their own private link."}
             {step === 2 && "Check the scope, attach the drawings they need to price from, and choose how it goes out."}
-            {step === 3 && "Each trade received a link unique to them. Their quotes land straight in this project."}
+            {step === 3 && "Each trade received a link unique to them. Their quotes land straight on this job."}
           </DialogDescription>
         </DialogHeader>
 

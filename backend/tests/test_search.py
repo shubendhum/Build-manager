@@ -16,13 +16,22 @@ def session():
     return s
 
 
+@pytest.fixture(scope="module")
+def suburb(session):
+    """Search against a job that actually exists rather than the deleted demo."""
+    projects = session.get(f"{API}/projects", timeout=15).json()
+    if not projects:
+        pytest.skip("no job to search for")
+    return projects[0]["site_suburb"]
+
+
 class TestSearch:
     def test_unauth_401(self):
         r = requests.get(f"{API}/search", params={"q": "ballarat"}, timeout=15)
         assert r.status_code == 401
 
-    def test_project_by_suburb(self, session):
-        r = session.get(f"{API}/search", params={"q": "ballarat"}, timeout=15)
+    def test_project_by_suburb(self, session, suburb):
+        r = session.get(f"{API}/search", params={"q": suburb}, timeout=15)
         assert r.status_code == 200
         results = r.json()["results"]
         assert any(x["type"] == "project" for x in results)
@@ -36,9 +45,9 @@ class TestSearch:
         assert r.status_code == 200
         assert any(x["type"] == "trade" for x in r.json()["results"])
 
-    def test_case_insensitive(self, session):
-        lower = session.get(f"{API}/search", params={"q": "ballarat"}, timeout=15).json()["results"]
-        upper = session.get(f"{API}/search", params={"q": "BALLARAT"}, timeout=15).json()["results"]
+    def test_case_insensitive(self, session, suburb):
+        lower = session.get(f"{API}/search", params={"q": suburb.lower()}, timeout=15).json()["results"]
+        upper = session.get(f"{API}/search", params={"q": suburb.upper()}, timeout=15).json()["results"]
         assert len(lower) == len(upper) > 0
 
     def test_short_query_empty(self, session):

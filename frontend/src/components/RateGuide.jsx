@@ -26,7 +26,7 @@ const fmtRange = (low, high) => {
   return low != null ? `${f(low)}+` : `up to ${f(high)}`;
 };
 
-export default function RateGuidePage() {
+export const RateGuide = () => {
   const [rates, setRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -64,11 +64,13 @@ export default function RateGuidePage() {
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-6 py-12" data-testid="rate-guide-page">
+    <section data-testid="rate-guide">
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-400 font-semibold mb-2">Cost Reference</p>
-          <h1 className="font-heading text-4xl font-bold tracking-tight text-slate-100">Victoria 2025 Rate Guide</h1>
+          <h2 className="font-heading text-lg font-bold uppercase tracking-wider text-slate-100">Prices</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            The rates the estimate lines are priced from. Western Victoria, 2025, ex-GST.
+          </p>
         </div>
         <div className="flex gap-3">
           <AlertDialog>
@@ -163,6 +165,6 @@ export default function RateGuidePage() {
       </div>
 
       <RateFormDialog open={formOpen} onOpenChange={setFormOpen} rate={editing} onSaved={fetchRates} />
-    </main>
+    </section>
   );
 }

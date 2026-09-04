@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  Plus, ChevronDown, Phone, Mail, Send, RefreshCw, CheckCircle2, FileText,
-  CalendarDays, Copy, AlertTriangle, DollarSign,
+  Plus, ChevronDown, Phone, Mail, Send, CheckCircle2, FileText, Pencil, Trash2,
+  CalendarDays, AlertTriangle, DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,9 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PackageFormDialog } from "@/components/PackageFormDialog";
+import { QuoteFormDialog } from "@/components/QuoteFormDialog";
+import { QuoteCard } from "@/components/QuoteCard";
+import { RfqPanel } from "@/components/RfqPanel";
 import { SendRfqDialog, copyRfqLink } from "@/components/SendRfqDialog";
 import { ScheduleDialog } from "@/components/ScheduleDialog";
 import { InvoiceFormDialog } from "@/components/InvoiceFormDialog";
@@ -33,12 +36,17 @@ const Money = ({ v, className = "" }) =>
   v ? <span className={`tabular-nums ${className}`}>{formatMoney(v)}</span>
     : <span className="text-slate-600">—</span>;
 
+// The money, plus how much of the build is actually priced — the coverage
+// figures the Packages screen used to hold on its own.
 const SummaryBar = ({ totals }) => (
-  <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-slate-700 rounded-md overflow-hidden border border-slate-700 mb-5"
+  <div className="grid grid-cols-2 md:grid-cols-6 gap-px bg-slate-700 rounded-md overflow-hidden border border-slate-700 mb-5"
     data-testid="board-summary">
     {[
       { k: "needs_you", label: "Needs you", v: totals.needs_you, plain: true,
         tone: totals.needs_you > 0 ? "text-amber-400" : "text-slate-400" },
+      { k: "priced", label: "Priced", plain: true,
+        v: `${totals.priced_count}/${totals.package_count}`,
+        tone: totals.priced_count < totals.package_count ? "text-slate-100" : "text-emerald-400" },
       { k: "committed", label: "Committed", v: totals.committed, tone: "text-slate-100" },
       { k: "invoiced", label: "Invoiced", v: totals.invoiced, tone: "text-slate-100" },
       { k: "paid", label: "Paid", v: totals.paid, tone: "text-emerald-400" },
@@ -258,9 +266,14 @@ const Row = ({ row, expanded, onToggle, onAction, detail }) => {
   );
 };
 
-const RowDetail = ({ row, data, onAction, onRefresh }) => {
+/**
+ * Everything about one trade package, opened in place: who you asked, every
+ * price that came back with the email it arrived in, the invoices, and the
+ * actions. This used to be three separate screens.
+ */
+const RowDetail = ({ row, data, onAction, onRefresh, onEditQuote }) => {
   if (!data) return <p className="text-xs text-slate-500">Loading…</p>;
-  const { quotes = [], invitations = [], invoices = [] } = data;
+  const { quotes = [], rfqs = [], invoices = [] } = data;
 
   const accept = async (q) => {
     try {
@@ -269,6 +282,16 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
       onRefresh();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not award this quote.");
+    }
+  };
+
+  const deleteQuote = async (q) => {
+    try {
+      await api.delete(`/quotes/${q.id}`);
+      toast.success(q.source === "email" ? "Discarded — still watching that thread" : "Quote deleted");
+      onRefresh();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not delete that quote.");
     }
   };
 
@@ -292,70 +315,18 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
         </div>
       )}
 
-      {invitations.length > 0 && (
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">Who you asked</p>
-          <div className="rounded-md border border-slate-700 divide-y divide-slate-800">
-            {invitations.map((inv) => (
-              <div key={inv.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
-                <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{inv.trade_name}</span>
-                <span className="text-[11px] text-slate-500">
-                  {inv.status === "submitted" ? "quoted"
-                    : inv.first_viewed_at ? "opened"
-                      : inv.sent_at ? "sent" : "not sent"}
-                </span>
-                <button onClick={() => copyRfqLink(inv.token)} title="Copy their link"
-                  data-testid={`board-copy-${inv.id}`}
-                  className="p-1 rounded-md text-slate-500 hover:text-amber-400 transition-colors duration-200">
-                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <RfqPanel rfqs={rfqs} onChanged={onRefresh} />
 
       {quotes.length > 0 && (
         <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">Prices</p>
-          <div className="rounded-md border border-slate-700 divide-y divide-slate-800">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1.5">
+            Prices in ({quotes.length})
+          </p>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
             {quotes.map((q) => (
-              <div key={q.id} className="flex flex-wrap items-center gap-3 px-3 py-2"
-                data-testid={`board-quote-${q.id}`}>
-                <span className="text-xs text-slate-300 flex-1 min-w-0 break-words">{q.trade_name}</span>
-                {q.lead_time && <span className="text-[11px] text-slate-500">{q.lead_time}</span>}
-                <span className="text-sm font-medium text-slate-100 tabular-nums">{formatMoney(q.total_inc_gst)}</span>
-                {q.status === "accepted" ? (
-                  <Badge variant="outline" className="bg-emerald-600/20 text-emerald-400 border-emerald-600/40 uppercase tracking-wider text-[10px]">
-                    Awarded
-                  </Badge>
-                ) : q.status === "rejected" ? (
-                  <span className="text-[11px] text-slate-600 w-20 text-right">not used</span>
-                ) : (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" data-testid={`board-award-${q.id}`}
-                        className="bg-emerald-600 text-white hover:bg-emerald-500 text-xs h-7">
-                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Award
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-card border-slate-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-slate-100">Award {row.title} to {q.trade_name}?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-400">
-                          {formatMoney(q.total_inc_gst)} inc GST. Every other price for this package is marked
-                          not used, and this becomes a committed cost.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="border-slate-600 text-slate-300">Cancel</AlertDialogCancel>
-                        <AlertDialogAction data-testid={`board-award-confirm-${q.id}`} onClick={() => accept(q)}
-                          className="bg-emerald-600 text-white hover:bg-emerald-500">Award</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
+              <QuoteCard key={q.id} quote={q} packageTitle={row.title}
+                onAccept={accept} onEdit={onEditQuote} onDelete={deleteQuote}
+                onUploaded={onRefresh} />
             ))}
           </div>
         </div>
@@ -407,6 +378,40 @@ const RowDetail = ({ row, data, onAction, onRefresh }) => {
           className="border-slate-600 text-slate-300 hover:text-amber-400 text-xs h-8">
           <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Add invoice
         </Button>
+        <Button size="sm" variant="outline" data-testid={`board-add-quote-${row.package_id}`}
+          onClick={() => onAction(row, "add-quote")}
+          className="border-slate-600 text-slate-300 hover:text-amber-400 text-xs h-8">
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Price by hand
+        </Button>
+        <span className="flex-1" />
+        <Button size="sm" variant="outline" data-testid={`board-edit-pkg-${row.package_id}`}
+          onClick={() => onAction(row, "edit-package")}
+          className="border-slate-600 text-slate-400 hover:text-amber-400 text-xs h-8">
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="outline" data-testid={`board-delete-pkg-${row.package_id}`}
+              className="border-slate-600 text-slate-400 hover:text-red-400 text-xs h-8">
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-card border-slate-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-slate-100">Remove {row.title} from this job?</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-400">
+                The package goes, along with the quote requests sent for it. Prices already received
+                and invoices stay on the job.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-slate-600 text-slate-300">Cancel</AlertDialogCancel>
+              <AlertDialogAction data-testid={`board-delete-pkg-confirm-${row.package_id}`}
+                onClick={() => onAction(row, "delete-package")}
+                className="bg-red-600 text-white hover:bg-red-500">Remove</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -421,6 +426,9 @@ export const TradeBoard = ({ projectId }) => {
   const [documents, setDocuments] = useState([]);
 
   const [pkgOpen, setPkgOpen] = useState(false);
+  const [editingPkg, setEditingPkg] = useState(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [editingQuote, setEditingQuote] = useState(null);
   const [sendOpen, setSendOpen] = useState(false);
   const [schedOpen, setSchedOpen] = useState(false);
   const [invOpen, setInvOpen] = useState(false);
@@ -457,8 +465,7 @@ export const TradeBoard = ({ projectId }) => {
       ...d,
       [row.package_id]: {
         quotes: q.data.filter((x) => x.package_id === row.package_id),
-        invitations: r.data.filter((x) => x.package_id === row.package_id)
-          .flatMap((x) => x.invitations || []),
+        rfqs: r.data.filter((x) => x.package_id === row.package_id),
         invoices: (i.data.invoices || i.data).filter(
           (x) => x.package_id === row.package_id || quoteIds.has(x.quote_id)),
       },
@@ -474,6 +481,19 @@ export const TradeBoard = ({ projectId }) => {
   const onAction = async (row, id, invoice) => {
     setActive(row);
     if (id === "get-quotes") { setSendOpen(true); return; }
+    if (id === "add-quote") { setEditingQuote(null); setQuoteOpen(true); return; }
+    if (id === "edit-package") { setEditingPkg(row); setPkgOpen(true); return; }
+    if (id === "delete-package") {
+      try {
+        await api.delete(`/packages/${row.package_id}`);
+        toast.success(`${row.title} removed`);
+        setExpanded(null);
+        fetchBoard();
+      } catch (e) {
+        toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Could not remove that package.");
+      }
+      return;
+    }
     if (id === "schedule") { setSchedOpen(true); return; }
     if (id === "invoice") { setInvOpen(true); return; }
     if (id === "pay") {
@@ -523,15 +543,16 @@ export const TradeBoard = ({ projectId }) => {
                 ? `${board.totals.needs_you} thing${board.totals.needs_you === 1 ? "" : "s"} need you`
                 : "Nothing waiting on you"}
             </p>
-            <Button size="sm" data-testid="board-add-package" onClick={() => setPkgOpen(true)}
+            <Button size="sm" data-testid="board-add-package"
+              onClick={() => { setEditingPkg(null); setPkgOpen(true); }}
               className="bg-amber-500 text-slate-950 font-heading font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors duration-200">
-              <Plus className="h-4 w-4" aria-hidden="true" /> Add Trade
+              <Plus className="h-4 w-4" aria-hidden="true" /> Add a trade package
             </Button>
           </div>
 
           {board.rows.length === 0 ? (
             <div className="rounded-md border border-slate-700 bg-slate-800/30 p-10 text-center" data-testid="board-empty">
-              <p className="text-sm text-slate-400 mb-1">No trades on this job yet.</p>
+              <p className="text-sm text-slate-400 mb-1">No trade packages on this job yet.</p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 Add one for each scope you need priced — plumbing, electrical, concrete — then send it to as
                 many tradies as you like and compare what comes back.
@@ -553,7 +574,8 @@ export const TradeBoard = ({ projectId }) => {
                   <Row key={row.package_id} row={row} expanded={expanded === row.package_id}
                     onToggle={() => toggle(row)} onAction={onAction}
                     detail={<RowDetail row={row} data={details[row.package_id]} onAction={onAction}
-                      onRefresh={() => { fetchBoard(); loadDetail(row); }} />} />
+                      onRefresh={() => { fetchBoard(); loadDetail(row); }}
+                      onEditQuote={(q) => { setActive(row); setEditingQuote(q); setQuoteOpen(true); }} />} />
                 ))}
               </div>
             </div>
@@ -561,7 +583,11 @@ export const TradeBoard = ({ projectId }) => {
         </>
       )}
 
-      <PackageFormDialog open={pkgOpen} onOpenChange={setPkgOpen} projectId={projectId} pkg={null} onSaved={fetchBoard} />
+      <PackageFormDialog open={pkgOpen} onOpenChange={setPkgOpen} projectId={projectId}
+        pkg={editingPkg && { ...editingPkg, id: editingPkg.package_id }} onSaved={fetchBoard} />
+      <QuoteFormDialog open={quoteOpen} onOpenChange={setQuoteOpen} projectId={projectId}
+        quote={editingQuote} trades={trades} pkg={active}
+        onSaved={() => { fetchBoard(); if (active) loadDetail(active); }} />
       <SendRfqDialog open={sendOpen} onOpenChange={setSendOpen} projectId={projectId}
         pkg={active} trades={trades} documents={documents} onSaved={fetchBoard} />
       <ScheduleDialog open={schedOpen} onOpenChange={setSchedOpen} row={active} onSaved={fetchBoard} />

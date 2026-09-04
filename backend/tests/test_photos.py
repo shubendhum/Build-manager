@@ -22,10 +22,20 @@ def session():
     return s
 
 
+def _sample_photo() -> bytes:
+    """A small JPEG, generated so the suite does not depend on a stray /tmp file."""
+    try:
+        with open(CONSTRUCTION_PHOTO, "rb") as f:
+            return f.read()
+    except OSError:
+        buf = io.BytesIO()
+        Image.new("RGB", (640, 480), (110, 120, 130)).save(buf, format="JPEG")
+        return buf.getvalue()
+
+
 @pytest.fixture(scope="module")
 def photo_bytes():
-    with open(CONSTRUCTION_PHOTO, "rb") as f:
-        return f.read()
+    return _sample_photo()
 
 
 # ---------- OpenAPI (unauth) ----------

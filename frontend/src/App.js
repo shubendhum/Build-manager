@@ -1,17 +1,14 @@
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import LoginPage from "@/pages/LoginPage";
-import DashboardPage from "@/pages/DashboardPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import TradesPage from "@/pages/TradesPage";
-import RateGuidePage from "@/pages/RateGuidePage";
 import SettingsPage from "@/pages/SettingsPage";
-import AnalyzePage from "@/pages/AnalyzePage";
 import QuotePortalPage from "@/pages/QuotePortalPage";
 
 function App() {
@@ -22,13 +19,14 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/quote/:token" element={<QuotePortalPage />} />
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-            <Route path="/" element={<DashboardPage />} />
+            {/* The app opens on the job list. Old links keep working. */}
+            <Route path="/" element={<ProjectsPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/trades" element={<TradesPage />} />
-            <Route path="/rates" element={<RateGuidePage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/analyzer" element={<AnalyzePage />} />
+            <Route path="/rates" element={<Navigate to="/settings" replace />} />
+            <Route path="/analyzer" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
         <Toaster position="top-right" richColors />

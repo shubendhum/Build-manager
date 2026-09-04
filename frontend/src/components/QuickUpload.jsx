@@ -22,7 +22,7 @@ const CATEGORIES = [
  * a long way for the thing you do every time a consultant emails a revision.
  * This lives in the job header on every tab, and the whole page accepts a drop.
  */
-export const QuickUpload = ({ projectId, onUploaded }) => {
+export const QuickUpload = ({ projectId, onUploaded, dropTarget = true, label = "Upload" }) => {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState([]);
   const [category, setCategory] = useState("drawings");
@@ -33,6 +33,7 @@ export const QuickUpload = ({ projectId, onUploaded }) => {
 
   // Drop anywhere on the job, not just on a target you have to find first.
   useEffect(() => {
+    if (!dropTarget) return undefined;
     const over = (e) => { e.preventDefault(); };
     const enter = (e) => {
       if (![...(e.dataTransfer?.types || [])].includes("Files")) return;
@@ -60,7 +61,7 @@ export const QuickUpload = ({ projectId, onUploaded }) => {
       window.removeEventListener("dragleave", leave);
       window.removeEventListener("drop", drop);
     };
-  }, []);
+  }, [dropTarget]);
 
   const pick = (e) => {
     const chosen = [...(e.target.files || [])];
@@ -99,13 +100,13 @@ export const QuickUpload = ({ projectId, onUploaded }) => {
       <Button size="sm" variant="outline" data-testid="quick-upload-button"
         onClick={() => inputRef.current?.click()}
         className="border-amber-500/50 bg-transparent text-amber-400 hover:bg-amber-500/10 hover:text-amber-300">
-        <Upload className="h-4 w-4" aria-hidden="true" /> Upload
+        <Upload className="h-4 w-4" aria-hidden="true" /> {label}
       </Button>
       <input ref={inputRef} type="file" multiple className="hidden" onChange={pick}
         data-testid="quick-upload-input"
         accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx,.csv,.txt" />
 
-      {dragging && (
+      {dropTarget && dragging && (
         <div className="fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center pointer-events-none"
           data-testid="drop-overlay">
           <div className="rounded-lg border-2 border-dashed border-amber-500 bg-slate-900/90 px-10 py-8 text-center">

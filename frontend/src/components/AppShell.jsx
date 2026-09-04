@@ -1,16 +1,15 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { HardHat, Home, Building2, Users, Calculator, Camera, LogOut, Settings } from "lucide-react";
+import { HardHat, Building2, Users, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GlobalSearch } from "@/components/GlobalSearch";
 
-// Icons are literal (a building means jobs, people mean tradies) and every one
-// carries its label — including on mobile, where they used to be bare glyphs.
+// Three places to be, and the app opens on the first of them. Home used to sit
+// above this list showing the same job list with a link back to the job list;
+// Prices was a reference table read by one dialog, and Photos held nothing you
+// could not do inside the job you were already standing in.
 const NAV = [
-  { to: "/", label: "Home", icon: Home, end: true, testId: "nav-dashboard" },
-  { to: "/projects", label: "Jobs", icon: Building2, end: false, testId: "nav-projects" },
+  { to: "/", label: "Jobs", icon: Building2, end: false, testId: "nav-projects" },
   { to: "/trades", label: "Tradies", icon: Users, end: false, testId: "nav-trades" },
-  { to: "/rates", label: "Prices", icon: Calculator, end: false, testId: "nav-rates" },
-  { to: "/analyzer", label: "Photos", icon: Camera, end: false, testId: "nav-analyzer" },
   { to: "/settings", label: "Settings", icon: Settings, end: false, testId: "nav-settings" },
 ];
 
