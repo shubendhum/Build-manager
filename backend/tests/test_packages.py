@@ -247,3 +247,42 @@ class TestChecklistCascade:
             assert d["items_done"] == 0
         finally:
             session.delete(f"{API}/projects/{pid}", timeout=T)
+
+
+class TestClearingADate:
+    """A date that can be set but not unset is a trap: the Timeline's handover
+    field looked like it cleared and silently did not."""
+
+    def test_a_date_can_be_cleared(self, session):
+        r = session.post(f"{API}/projects", timeout=T, json={
+            "name": f"DATES {uuid.uuid4().hex[:8]}", "client_name": "C",
+            "site_suburb": "Ballarat", "site_postcode": "3350",
+            "target_completion": "2027-06-30", "start_date": "2026-09-01",
+        })
+        pid = r.json()["id"]
+        try:
+            assert r.json()["target_completion"] == "2027-06-30"
+
+            cleared = session.put(f"{API}/projects/{pid}", timeout=T,
+                                  json={"target_completion": None})
+            assert cleared.status_code == 200, cleared.text
+            assert cleared.json()["target_completion"] is None
+            # Anything not mentioned is left alone.
+            assert cleared.json()["start_date"] == "2026-09-01"
+            assert cleared.json()["name"].startswith("DATES")
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=T)
+
+    def test_omitting_a_field_leaves_it_alone(self, session):
+        r = session.post(f"{API}/projects", timeout=T, json={
+            "name": f"KEEP {uuid.uuid4().hex[:8]}", "client_name": "Original",
+            "site_suburb": "Ballarat", "site_postcode": "3350", "contract_value": 500000,
+        })
+        pid = r.json()["id"]
+        try:
+            out = session.put(f"{API}/projects/{pid}", json={"status": "active"}, timeout=T).json()
+            assert out["status"] == "active"
+            assert out["client_name"] == "Original"
+            assert out["contract_value"] == 500000
+        finally:
+            session.delete(f"{API}/projects/{pid}", timeout=T)

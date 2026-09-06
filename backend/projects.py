@@ -200,7 +200,10 @@ async def update_project(project_id: str, data: ProjectUpdate):
     existing = await db.projects.find_one({"id": project_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Project not found.")
-    updates = {k: v for k, v in data.model_dump().items() if v is not None}
+    # exclude_unset, not "drop the nulls": a field that was sent as null was
+    # cleared on purpose, and dropping it meant a handover date, a DBI expiry or
+    # a site start could be set but never unset.
+    updates = data.model_dump(exclude_unset=True)
     validate_project_fields(updates.get("project_type"), updates.get("status"), updates.get("site_postcode"))
     updates["updated_at"] = now_iso()
     await db.projects.update_one({"id": project_id}, {"$set": updates})

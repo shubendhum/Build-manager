@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  CalendarRange, Package, Truck, AlertTriangle, CheckCircle2, Plus, Loader2,
-  OctagonAlert, Ruler,
+  Package, Truck, AlertTriangle, CheckCircle2, Plus, Loader2, OctagonAlert, Ruler,
+  Map as MapIcon, List,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { BuildRoad } from "@/components/BuildRoad";
+import { RoadOverview } from "@/components/RoadOverview";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { formatDate } from "@/lib/projectUtils";
 
@@ -25,6 +26,12 @@ const STEP_STATE = {
   current: "border-l-amber-500 text-slate-100",
   ahead: "border-l-slate-800 text-slate-400",
 };
+
+/** The road is for reading; the list is for checking dates. Both, switchable. */
+const VIEWS = [
+  ["road", "Road", MapIcon],
+  ["list", "Dates", List],
+];
 
 const shortDate = (iso) => {
   const d = new Date(`${iso}T00:00:00`);
@@ -114,6 +121,7 @@ const OrderRow = ({ order, onRaise, busy }) => {
 export const TimelineTab = ({ project, onChanged }) => {
   const [plan, setPlan] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState("road");
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -218,47 +226,81 @@ export const TimelineTab = ({ project, onChanged }) => {
         </section>
       )}
 
-      <section className="mb-5" data-testid="build-timeline">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">
-          The build, step by step
-        </p>
-        <div className="rounded-md border border-slate-700 bg-card divide-y divide-slate-800">
-          {plan.steps.map((s) => (
-            <div key={s.n}
-              className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 sm:px-4 py-2.5 border-l-2 ${
-                STEP_STATE[s.state] || STEP_STATE.ahead} ${s.behind ? "bg-red-500/[0.06]" : ""}`}
-              data-testid={`timeline-step-${s.n}`}>
-              <span className="text-[11px] tabular-nums text-slate-600 w-6 shrink-0 text-right">{s.n}</span>
-              <span className="min-w-0 flex-1 text-sm break-words">
-                {s.name}
-                {s.parallel && (
-                  <span className="text-[11px] text-slate-500 ml-2">runs alongside the step before</span>
-                )}
-                {s.packages.length > 0 && (
-                  <span className="block text-[11px] text-slate-500 break-words">
-                    {s.packages.map((p) => p.title).join(", ")}
-                  </span>
-                )}
-              </span>
-              {s.mandatory && (
-                <Badge variant="outline"
-                  className="shrink-0 bg-amber-500/15 text-amber-400 border-amber-500/50 uppercase tracking-wider text-[10px]">
-                  Hold point
-                </Badge>
-              )}
-              {s.behind && (
-                <Badge variant="outline"
-                  className="shrink-0 bg-red-500/15 text-red-400 border-red-500/50 uppercase tracking-wider text-[10px]">
-                  Behind
-                </Badge>
-              )}
-              <span className="text-xs tabular-nums text-slate-400 shrink-0 w-[8.5rem] text-right">
-                {shortDate(s.start)} – {shortDate(s.finish)}
-              </span>
-              <span className="text-[11px] tabular-nums text-slate-600 shrink-0 w-8 text-right">{s.days}d</span>
-            </div>
-          ))}
+      <section className="rounded-md border border-slate-700 bg-card p-4 sm:p-5 mb-5"
+        data-testid="build-timeline">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+            The whole build, start to handover
+          </p>
+          <div className="flex rounded-md border border-slate-700 overflow-hidden" role="group">
+            {VIEWS.map(([key, label, Icon]) => (
+              <button key={key} type="button" onClick={() => setView(key)}
+                data-testid={`timeline-view-${key}`} aria-pressed={view === key}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors duration-200 ${
+                  view === key ? "bg-amber-500 text-slate-950 font-bold"
+                    : "text-slate-400 hover:text-slate-100"}`}>
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" /> {label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <RoadOverview steps={plan.steps} currentStep={plan.current_step}
+          onJump={(s) => {
+            setView("road");
+            setTimeout(() => document.querySelector(`[data-testid="road-node-${s.n}"]`)
+              ?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+          }} />
+
+        <div className="mt-6">
+          {view === "road" ? (
+            <BuildRoad steps={plan.steps} orders={plan.orders} today={plan.today} />
+          ) : (
+            <div className="rounded-md border border-slate-700 divide-y divide-slate-800">
+              {plan.steps.map((s) => (
+                <div key={s.n}
+                  className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 sm:px-4 py-2.5 border-l-2 ${
+                    STEP_STATE[s.state] || STEP_STATE.ahead} ${s.behind ? "bg-red-500/[0.06]" : ""}`}
+                  data-testid={`timeline-step-${s.n}`}>
+                  <span className="text-[11px] tabular-nums text-slate-600 w-6 shrink-0 text-right">{s.n}</span>
+                  <span className="min-w-0 flex-1 text-sm break-words">
+                    {s.name}
+                    {s.parallel && (
+                      <span className="text-[11px] text-slate-500 ml-2">runs alongside the step before</span>
+                    )}
+                    {s.packages.length > 0 && (
+                      <span className="block text-[11px] text-slate-500 break-words">
+                        {s.packages.map((p) => p.title).join(", ")}
+                      </span>
+                    )}
+                  </span>
+                  {s.mandatory && (
+                    <span className="shrink-0 rounded border border-amber-500/50 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                      Hold point
+                    </span>
+                  )}
+                  {s.behind && (
+                    <span className="shrink-0 rounded border border-red-500/50 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-400">
+                      Behind
+                    </span>
+                  )}
+                  <span className="text-xs tabular-nums text-slate-400 shrink-0 w-[8.5rem] text-right">
+                    {shortDate(s.start)} – {shortDate(s.finish)}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-slate-600 shrink-0 w-8 text-right">{s.days}d</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {view === "road" && (
+          <p className="text-xs text-slate-500 mt-5 pt-4 border-t border-slate-800">
+            Distance down the road is time. The sealed road behind you is what has passed; the
+            dashed road ahead has not happened yet. Signposts sit at the date an order has to be
+            placed — one behind you is one you have missed.
+          </p>
+        )}
       </section>
 
       <section data-testid="orders-all">
